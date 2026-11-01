@@ -84,7 +84,6 @@ impl PrivacyEngine {
         // Habilitar almacenamiento HTML5 (LocalStorage, IndexedDB y bases de datos locales)
         settings.set_enable_html5_local_storage(true);
         settings.set_enable_html5_database(true);
-        settings.set_enable_offline_web_application_cache(true);
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
 
         // Permitir acceso al portapapeles (copiar código y respuestas en ChatGPT)
@@ -126,12 +125,12 @@ impl PrivacyEngine {
         settings.set_enable_site_specific_quirks(true);
 
         // =======================================================
-        // Optimización de Fluidez, Rendimiento y Caché
+        // Optimización de Fluidez, Rendimiento y Caché de Memoria
         // =======================================================
         settings.set_enable_smooth_scrolling(true);
         settings.set_enable_webgl(true);
-        settings.set_enable_page_cache(true); // Navegación instantánea atrás/adelante
-        settings.set_enable_dns_prefetching(true);
+        // Desactivar page-cache en memoria para evitar acumulación desmedida de RAM por pestañas
+        settings.set_enable_page_cache(false);
 
         // =======================================================
         // Soporte de Reproducción de Videos (YouTube, HTML5, MSE)
@@ -173,6 +172,26 @@ impl PrivacyEngine {
                     }
                 }
             });
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_privacy_rules_json_validity() {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        let path = PathBuf::from(manifest_dir).join("resources").join("rules").join("privacy-rules.json");
+        let content = std::fs::read_to_string(&path).expect("privacy-rules.json must exist");
+        let json: serde_json::Value = serde_json::from_str(&content).expect("privacy-rules.json must be valid JSON");
+        assert!(json.is_array());
+        let arr = json.as_array().unwrap();
+        assert!(!arr.is_empty());
+        for rule in arr {
+            assert!(rule.get("trigger").is_some());
+            assert!(rule.get("action").is_some());
         }
     }
 }

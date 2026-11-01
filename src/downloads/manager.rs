@@ -1,5 +1,6 @@
 use super::entry::{format_bytes, get_unique_download_path, DownloadEntry, DownloadState};
 use crate::settings::BrowserSettings;
+use gio::prelude::*;
 use glib::clone;
 use gtk4::prelude::*;
 use std::cell::RefCell;
@@ -9,6 +10,8 @@ use webkit6::Download;
 
 pub struct DownloadManager {
     pub button: gtk4::Button,
+    pub active_dot: gtk4::Label,
+    pub badge_label: gtk4::Label,
     pub revealer: gtk4::Revealer,
     pub items_box: gtk4::Box,
     pub empty_label: gtk4::Label,
@@ -18,16 +21,38 @@ pub struct DownloadManager {
     pub downloads: Rc<RefCell<Vec<Rc<RefCell<DownloadEntry>>>>>,
     pub settings: Rc<RefCell<BrowserSettings>>,
     next_id: RefCell<u64>,
-    is_animating: Rc<RefCell<bool>>,
+    pub completed_count: Rc<RefCell<u32>>,
 }
 
 impl DownloadManager {
     pub fn new(settings: Rc<RefCell<BrowserSettings>>) -> Rc<Self> {
-        let button = gtk4::Button::from_icon_name("nika-download-symbolic");
+        let button = gtk4::Button::new();
         button.add_css_class("download-btn");
         button.set_tooltip_text(Some("Descargas (Ctrl+J)"));
         button.set_valign(gtk4::Align::Center);
         button.set_halign(gtk4::Align::Center);
+
+        let btn_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
+        btn_box.set_valign(gtk4::Align::Center);
+        btn_box.set_halign(gtk4::Align::Center);
+
+        let icon_img = gtk4::Image::from_icon_name("nika-download-symbolic");
+        icon_img.set_pixel_size(14);
+
+        let active_dot = gtk4::Label::new(Some("●"));
+        active_dot.add_css_class("download-active-dot");
+        active_dot.set_valign(gtk4::Align::Center);
+        active_dot.set_halign(gtk4::Align::Center);
+        active_dot.set_visible(false);
+
+        let badge_label = gtk4::Label::new(None);
+        badge_label.add_css_class("download-badge");
+        badge_label.set_visible(false);
+
+        btn_box.append(&icon_img);
+        btn_box.append(&active_dot);
+        btn_box.append(&badge_label);
+        button.set_child(Some(&btn_box));
 
         // Panel lateral flotante de descargas
         let revealer = gtk4::Revealer::new();
@@ -97,8 +122,12 @@ impl DownloadManager {
         card.append(&scroll);
         revealer.set_child(Some(&card));
 
+        let completed_count = Rc::new(RefCell::new(0));
+
         let mgr = Rc::new(Self {
             button: button.clone(),
+            active_dot,
+            badge_label,
             revealer: revealer.clone(),
             items_box,
             empty_label,
@@ -108,15 +137,21 @@ impl DownloadManager {
             downloads: Rc::new(RefCell::new(Vec::new())),
             settings,
             next_id: RefCell::new(1),
-            is_animating: Rc::new(RefCell::new(false)),
+            completed_count,
         });
 
+        let mgr_weak = Rc::downgrade(&mgr);
         button.connect_clicked(clone!(
             #[weak]
             revealer,
             move |_| {
                 let cur = revealer.reveals_child();
                 revealer.set_reveal_child(!cur);
+                if !cur {
+                    if let Some(m) = mgr_weak.upgrade() {
+                        m.clear_badge();
+                    }
+                }
             }
         ));
 
@@ -129,6 +164,53 @@ impl DownloadManager {
         ));
 
         mgr
+    }
+
+    /// Limpia el número badge de descargas completadas
+    pub fn clear_badge(&self) {
+        *self.completed_count.borrow_mut() = 0;
+        self.badge_label.set_visible(false);
+    }
+
+    /// Actualiza el estado visual del botón según si hay descargas activas (iluminado fijo y punto indicador)
+    pub fn update_active_state(&self) {
+        let any_in_progress = self.downloads.borrow().iter().any(|e| {
+            if let Ok(entry) = e.try_borrow() {
+                entry.state == DownloadState::InProgress
+            } else {
+                false
+            }
+        });
+
+        let lang = self.settings.borrow().language.clone();
+        if any_in_progress {
+            self.button.add_css_class("download-active");
+            self.active_dot.set_visible(true);
+            self.button.set_tooltip_text(Some(crate::i18n::tr(&lang, "download_in_progress")));
+        } else {
+            self.button.remove_css_class("download-active");
+            self.active_dot.set_visible(false);
+            self.button.set_tooltip_text(Some(crate::i18n::tr(&lang, "nav_downloads")));
+        }
+    }
+
+    /// Incrementa el contador badge y envía notificación de escritorio del sistema
+    pub fn notify_completed(&self, filename: &str) {
+        *self.completed_count.borrow_mut() += 1;
+        let count = *self.completed_count.borrow();
+        self.badge_label.set_text(&count.to_string());
+        self.badge_label.set_visible(true);
+
+        let lang = self.settings.borrow().language.clone();
+        let title = crate::i18n::tr(&lang, "download_completed");
+        let prefix = crate::i18n::tr(&lang, "download_completed_body");
+        let body = format!("{}{}", prefix, filename);
+
+        let gnotif = gio::Notification::new(title);
+        gnotif.set_body(Some(&body));
+        if let Some(app) = gio::Application::default() {
+            app.send_notification(None, &gnotif);
+        }
     }
 
     /// Actualiza textos y tooltips del gestor de descargas según el idioma
@@ -187,8 +269,7 @@ impl DownloadManager {
 
         self.downloads.borrow_mut().push(entry.clone());
         self.empty_label.set_visible(false);
-
-        self.start_download_animation();
+        self.update_active_state();
 
         let row = gtk4::Box::new(gtk4::Orientation::Vertical, 3);
         row.add_css_class("tab-pill");
@@ -241,6 +322,7 @@ impl DownloadManager {
         row.append(&progress_bar);
 
         let del_btn_for_cancel = delete_btn.clone();
+        let mgr_cancel = Rc::downgrade(self);
         cancel_btn.connect_clicked(clone!(
             #[strong]
             entry,
@@ -262,12 +344,16 @@ impl DownloadManager {
                 progress_bar.set_visible(false);
                 btn.set_visible(false);
                 del_btn_for_cancel.set_visible(true);
+                if let Some(m) = mgr_cancel.upgrade() {
+                    m.update_active_state();
+                }
             }
         ));
 
         let dls_for_delete = self.downloads.clone();
         let ibox_for_delete = self.items_box.clone();
         let empty_lbl_for_delete = self.empty_label.clone();
+        let mgr_delete = Rc::downgrade(self);
         delete_btn.connect_clicked(clone!(
             #[weak]
             row,
@@ -282,6 +368,9 @@ impl DownloadManager {
                 });
                 if dls_for_delete.borrow().is_empty() {
                     empty_lbl_for_delete.set_visible(true);
+                }
+                if let Some(m) = mgr_delete.upgrade() {
+                    m.update_active_state();
                 }
             }
         ));
@@ -330,8 +419,8 @@ impl DownloadManager {
             }
         ));
 
-        let btn_finish = self.button.clone();
         let del_btn_finish = delete_btn.clone();
+        let mgr_finish = Rc::downgrade(self);
         download.connect_finished(clone!(
             #[strong]
             entry,
@@ -344,7 +433,7 @@ impl DownloadManager {
             #[weak]
             open_btn,
             #[weak]
-            btn_finish,
+            del_btn_finish,
             move |dl| {
                 let is_cancelled_or_failed = if let Ok(e) = entry.try_borrow() {
                     e.state == DownloadState::Cancelled || matches!(e.state, DownloadState::Failed(_))
@@ -359,31 +448,35 @@ impl DownloadManager {
                     progress_bar.set_fraction(1.0);
                     progress_bar.set_visible(false);
                     let bytes = dl.received_data_length();
-                    status_label.set_text(&format!("Completado ({})", format_bytes(bytes)));
+                    let lang = if let Some(m) = mgr_finish.upgrade() {
+                        m.settings.borrow().language.clone()
+                    } else {
+                        "es".to_string()
+                    };
+                    let completed_text = crate::i18n::tr(&lang, "completed");
+                    status_label.set_text(&format!("{} ({})", completed_text, format_bytes(bytes)));
                     cancel_btn.set_visible(false);
                     open_btn.set_visible(true);
                     del_btn_finish.set_visible(true);
+
+                    let fname = if let Ok(e) = entry.try_borrow() {
+                        e.filename.clone()
+                    } else {
+                        "archivo".to_string()
+                    };
+                    if let Some(m) = mgr_finish.upgrade() {
+                        m.notify_completed(&fname);
+                    }
                 }
-                btn_finish.remove_css_class("download-animating");
-                btn_finish.remove_css_class("download-pulse");
-                btn_finish.add_css_class("download-completed");
-                btn_finish.set_tooltip_text(Some("Descarga completada"));
-                glib::timeout_add_local_once(
-                    std::time::Duration::from_secs(4),
-                    clone!(
-                        #[weak]
-                        btn_finish,
-                        move || {
-                            btn_finish.remove_css_class("download-completed");
-                            btn_finish.set_tooltip_text(Some("Descargas (Ctrl+J)"));
-                        }
-                    ),
-                );
+
+                if let Some(m) = mgr_finish.upgrade() {
+                    m.update_active_state();
+                }
             }
         ));
 
-        let btn_fail = self.button.clone();
         let del_btn_fail = delete_btn;
+        let mgr_fail = Rc::downgrade(self);
         download.connect_failed(clone!(
             #[strong]
             entry,
@@ -393,8 +486,6 @@ impl DownloadManager {
             status_label,
             #[weak]
             cancel_btn,
-            #[weak]
-            btn_fail,
             move |_, err| {
                 if let Ok(mut e) = entry.try_borrow_mut() {
                     e.state = DownloadState::Failed(err.to_string());
@@ -403,50 +494,10 @@ impl DownloadManager {
                 status_label.set_text(&format!("Error: {}", err));
                 cancel_btn.set_visible(false);
                 del_btn_fail.set_visible(true);
-                btn_fail.remove_css_class("download-animating");
-                btn_fail.remove_css_class("download-pulse");
+                if let Some(m) = mgr_fail.upgrade() {
+                    m.update_active_state();
+                }
             }
         ));
-    }
-
-    fn start_download_animation(&self) {
-        if *self.is_animating.borrow() {
-            return;
-        }
-        *self.is_animating.borrow_mut() = true;
-        self.button.add_css_class("download-animating");
-        self.button.set_tooltip_text(Some("Descargando archivo... (Clic o Ctrl+J para ver)"));
-
-        let btn = self.button.clone();
-        let is_anim = self.is_animating.clone();
-        let downloads = self.downloads.clone();
-
-        glib::timeout_add_local(
-            std::time::Duration::from_millis(350),
-            move || {
-                let any_in_progress = downloads.borrow().iter().any(|e| {
-                    if let Ok(entry) = e.try_borrow() {
-                        entry.state == DownloadState::InProgress
-                    } else {
-                        false
-                    }
-                });
-
-                if !any_in_progress {
-                    *is_anim.borrow_mut() = false;
-                    btn.remove_css_class("download-pulse");
-                    btn.remove_css_class("download-animating");
-                    return glib::ControlFlow::Break;
-                }
-
-                if btn.has_css_class("download-pulse") {
-                    btn.remove_css_class("download-pulse");
-                } else {
-                    btn.add_css_class("download-pulse");
-                }
-
-                glib::ControlFlow::Continue
-            }
-        );
     }
 }

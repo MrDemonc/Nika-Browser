@@ -837,7 +837,7 @@ box.floating-sidebar {
   border-radius: 6px;
   min-width: 26px;
   min-height: 26px;
-  padding: 0;
+  padding: 0 4px;
   margin: 0 1px;
   border: 1px solid transparent;
   transition: all 140ms ease;
@@ -855,15 +855,39 @@ box.floating-sidebar {
   border-color: #333333;
 }
 
-.download-btn.download-animating {
-  color: #10ac84;
+/* Estado activo estable: iluminado continuo sin pulsación */
+.download-btn.download-active {
+  color: #1dd1a1;
+  background-color: rgba(29, 209, 161, 0.18);
+  border-color: rgba(29, 209, 161, 0.45);
 }
 
-.download-btn.download-pulse {
+.dark-theme .download-btn.download-active {
   color: #1dd1a1;
-  background-color: rgba(16, 172, 132, 0.25);
-  border-color: rgba(16, 172, 132, 0.45);
-  box-shadow: 0 0 10px rgba(16, 172, 132, 0.4);
+  background-color: rgba(29, 209, 161, 0.22);
+  border-color: rgba(29, 209, 161, 0.5);
+}
+
+/* Punto indicador de descargas activas junto al icono */
+.download-active-dot {
+  color: #1dd1a1;
+  font-size: 8px;
+  line-height: 8px;
+  margin-left: 2px;
+  margin-right: 1px;
+}
+
+/* Contador numérico de descargas junto al icono */
+.download-badge {
+  background-color: #10ac84;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 9999px;
+  min-width: 15px;
+  min-height: 15px;
+  padding: 0 3px;
+  margin-left: 3px;
 }
 
 .download-btn.download-completed {

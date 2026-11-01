@@ -49,6 +49,19 @@ impl BrowserApp {
         let settings = Rc::new(RefCell::new(BrowserSettings::load()));
         settings.borrow().apply_dns();
 
+        // Optimización de memoria WebKit: Modelo de caché DocumentBrowser y límites de presión de RAM
+        if let Some(ctx) = webkit6::WebContext::default() {
+            ctx.set_cache_model(webkit6::CacheModel::DocumentBrowser);
+        }
+
+        let mut mem_settings = webkit6::MemoryPressureSettings::new();
+        mem_settings.set_memory_limit(512);
+        mem_settings.set_kill_threshold(0.95);
+        mem_settings.set_strict_threshold(0.85);
+        mem_settings.set_conservative_threshold(0.70);
+        mem_settings.set_poll_interval(2.0);
+        webkit6::NetworkSession::set_memory_pressure_settings(&mut mem_settings);
+
         let data_dir = glib::user_data_dir().join("nika-browser");
         let cache_dir = glib::user_cache_dir().join("nika-browser");
         let _ = std::fs::create_dir_all(&data_dir);
@@ -766,6 +779,8 @@ impl BrowserApp {
                         let mut tabs = browser.tabs.borrow_mut();
                         if let Some(pos) = tabs.iter().position(|t| t.page == *page) {
                             let tab = tabs.remove(pos);
+                            tab.webview.stop_loading();
+                            tab.webview.load_uri("about:blank");
                             Some((tab.tab_pill, tab.is_incognito))
                         } else {
                             None
@@ -896,6 +911,9 @@ impl BrowserApp {
                 if is_ctrl && (keyval == gtk4::gdk::Key::j || keyval == gtk4::gdk::Key::J) {
                     let cur = browser.download_manager.revealer.reveals_child();
                     browser.download_manager.revealer.set_reveal_child(!cur);
+                    if !cur {
+                        browser.download_manager.clear_badge();
+                    }
                     return glib::Propagation::Stop;
                 }
 

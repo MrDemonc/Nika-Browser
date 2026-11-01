@@ -697,13 +697,16 @@ impl BrowserTab {
                             }
                         }
 
-                        let dark = *is_dark_rc.borrow();
-                        let js = if dark {
-                            "if (document.body) { document.body.classList.add('dark'); }"
-                        } else {
-                            "if (document.body) { document.body.classList.remove('dark'); }"
-                        };
-                        view.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+                        let uri_str = view.uri().map(|u| u.to_string()).unwrap_or_default();
+                        if uri_str.starts_with("nika://") || uri_str.starts_with("file://") || uri_str == "about:blank" {
+                            let dark = *is_dark_rc.borrow();
+                            let js = if dark {
+                                "if (document.body) { document.body.classList.add('dark'); }"
+                            } else {
+                                "if (document.body) { document.body.classList.remove('dark'); }"
+                            };
+                            view.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+                        }
                     }
                     _ => {}
                 }
@@ -848,12 +851,15 @@ impl BrowserTab {
 
     pub fn apply_theme_to_page(&self, is_dark: bool) {
         *self.is_dark.borrow_mut() = is_dark;
-        let js = if is_dark {
-            "if (document.body) { document.body.classList.add('dark'); }"
-        } else {
-            "if (document.body) { document.body.classList.remove('dark'); }"
-        };
-        self.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+        let uri = self.current_url.borrow().clone();
+        if uri.starts_with("nika://") || uri.starts_with("file://") || uri == "about:blank" {
+            let js = if is_dark {
+                "if (document.body) { document.body.classList.add('dark'); }"
+            } else {
+                "if (document.body) { document.body.classList.remove('dark'); }"
+            };
+            self.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+        }
     }
 
     pub fn go_back(&self) {
