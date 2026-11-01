@@ -18,7 +18,7 @@ pub const BUILD_TARGET: &str = env!("NIKA_BUILD_TARGET");
 /// Devuelve el banner formateado completo de información de versión
 pub fn version_info_string() -> String {
     format!(
-        "{} v{}\nCompilado el: {}\nTarget: {} (git: {})\nLicencia: MIT",
+        "{} v{}\nCompilado el: {}\nTarget: {} (git: {})\nLicencia: GNU GPL v3.0",
         APP_NAME, VERSION, BUILD_DATE, BUILD_TARGET, GIT_COMMIT
     )
 }

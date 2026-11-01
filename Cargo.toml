@@ -3,7 +3,8 @@ name = "nika-browser"
 version = "0.1.0-alpha.1"
 edition = "2024"
 authors = ["demonc"]
-description = "Navegador web moderno, minimalista y seguro en Rust con WebKit, bloqueo de rastreadores y tema oscuro refinado."
+description = "Modern, minimalist, fast and privacy-focused web browser in Rust with WebKit, tracker blocking and refined dark theme."
+license = "GPL-3.0-or-later"
 
 [dependencies]
 gtk4 = { version = "0.11", features = ["v4_14"] }
