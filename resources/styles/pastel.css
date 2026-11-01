@@ -1,0 +1,1203 @@
+/* ==========================================================
+   Nika Browser - Pure Dark Theme (GTK4 & Libadwaita)
+   Negro Puro y Grises Neutros (0 tonos azules)
+   ========================================================== */
+
+@define-color dialog_bg_color #121212;
+@define-color dialog_fg_color #f0f0f0;
+@define-color window_bg_color #000000;
+@define-color window_fg_color #f0f0f0;
+@define-color view_bg_color #121212;
+@define-color view_fg_color #f0f0f0;
+@define-color headerbar_bg_color #0a0a0a;
+@define-color headerbar_fg_color #f0f0f0;
+@define-color card_bg_color #181818;
+@define-color card_fg_color #f0f0f0;
+
+:root,
+window.dark-theme,
+.dark-theme {
+  --pastel-lavender: #b8b8b8;
+  --pastel-lavender-hover: #d0d0d0;
+  --pastel-mint: #a8a8a8;
+  --pastel-mint-hover: #c0c0c0;
+  --pastel-peach: #b0b0b0;
+  --pastel-sky: #9a9a9a;
+  --pastel-pink: #b8b8b8;
+
+  --nika-bg: #000000;
+  --nika-header-bg: #0a0a0a;
+  --nika-tabs-bg: #101010;
+  --nika-tab-pill-bg: #181818;
+  --nika-tab-pill-active: #262626;
+  --nika-text: #f0f0f0;
+  --nika-text-muted: #8a8a8a;
+  --nika-border: #222222;
+  --nika-entry-bg: #121212;
+  --nika-accent: #555555;
+  --nika-shield-badge: #1c1c1c;
+  --nika-shield-text: #cccccc;
+}
+
+/* Ventana principal */
+window.nika-window,
+window.nika-window {
+  background-color: var(--nika-bg);
+  color: var(--nika-text);
+}
+
+/* HeaderBar ultra-minimalista, compacta y delgada con fondo 100% opaco */
+window.nika-window headerbar,
+window.nika-window headerbar,
+headerbar.nika-header,
+headerbar.nika-header.flat,
+headerbar {
+  background-color: #0a0a0a;
+  background: #0a0a0a;
+  border: none;
+  border-bottom: 1px solid var(--nika-border);
+  box-shadow: none;
+  padding: 1px 6px;
+  min-height: 28px;
+}
+
+headerbar.nika-header > windowhandle,
+headerbar.nika-header > windowhandle > box,
+headerbar.nika-header windowhandle,
+headerbar.nika-header .header-bar,
+headerbar.nika-header box {
+  background: transparent;
+  border: none;
+  border-bottom: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+}
+
+.nika-main-box,
+.nika-content-box,
+tabview,
+overlay {
+  background: transparent;
+  border: none;
+  border-top: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+
+progressbar.pastel-progress,
+progressbar.pastel-progress > trough {
+  border: none;
+  box-shadow: none;
+  outline: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Botones de navegación pequeños, compactos, modernos y refinados */
+.nav-button {
+  background: transparent;
+  color: #c0c0c0;
+  border-radius: 5px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  margin: 0 1px;
+  border: 1px solid transparent;
+  transition: all 140ms ease;
+  -gtk-icon-size: 13px;
+}
+
+.nav-button:hover {
+  background-color: #202020;
+  border-color: #303030;
+  color: #ffffff;
+}
+
+.nav-button:active {
+  background-color: #282828;
+}
+
+/* Barra de direcciones / Omnibox compacta horizontalmente */
+entry.omnibox {
+  background-color: var(--nika-entry-bg);
+  color: var(--nika-text);
+  border: 1px solid var(--nika-border);
+  border-radius: 12px;
+  padding: 1px 12px;
+  font-size: 11.5px;
+  min-height: 24px;
+  min-width: 280px;
+  transition: all 160ms ease;
+  -gtk-icon-size: 12px;
+}
+
+entry.omnibox:focus {
+  border-color: var(--nika-accent);
+  box-shadow: 0 0 0 1.5px rgba(158, 149, 135, 0.25);
+}
+
+/* Botón del Escudo de Privacidad compacto */
+.shield-pill {
+  background-color: #141414;
+  color: #10ac84;
+  border-radius: 5px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  margin: 0 1px;
+  border: 1px solid #242424;
+  transition: all 140ms ease;
+  -gtk-icon-size: 13px;
+}
+
+.shield-pill label {
+  font-size: 12px;
+  padding: 0;
+  margin: 0;
+}
+
+.shield-pill:hover {
+  background-color: #1e1e1e;
+  border-color: #333333;
+  color: #1dd1a1;
+}
+
+/* Botón de Permisos del Sitio en Header */
+.permissions-btn {
+  background-color: transparent;
+  color: #10ac84;
+  border-radius: 6px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0 4px;
+  margin-right: 2px;
+  border: 1px solid transparent;
+  transition: all 140ms ease;
+  -gtk-icon-size: 13px;
+}
+
+/* Ventana / Diálogo de Permisos del Sitio Centrado */
+dialog.permissions-dialog,
+.permissions-dialog {
+  background-color: #101010;
+  border: 1px solid #282828;
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.95);
+  color: #e0e0e0;
+}
+
+dialog.permissions-dialog > contents,
+.permissions-dialog > contents {
+  background-color: #101010;
+  border-radius: 14px;
+}
+
+.perm-header-bar {
+  background-color: #101010;
+  border-bottom: 1px solid #1c1c1c;
+  min-height: 38px;
+  padding: 0 6px;
+}
+
+.perm-dialog-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f0f0f0;
+}
+
+.perm-close-btn {
+  background-color: transparent;
+  color: #888888;
+  border-radius: 50%;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 2px;
+  transition: all 120ms ease;
+}
+
+.perm-close-btn:hover {
+  background-color: #262626;
+  color: #ffffff;
+}
+
+.perm-host-card {
+  background-color: #161616;
+  border: 1px solid #222222;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.perm-host-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.perm-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 5px;
+  letter-spacing: 0.3px;
+}
+
+.perm-badge-secure {
+  background-color: rgba(16, 172, 132, 0.15);
+  color: #1dd1a1;
+  border: 1px solid rgba(16, 172, 132, 0.3);
+}
+
+.perm-badge-warning {
+  background-color: rgba(230, 126, 34, 0.15);
+  color: #f39c12;
+  border: 1px solid rgba(230, 126, 34, 0.3);
+}
+
+.perm-badge-sys {
+  background-color: rgba(124, 92, 191, 0.15);
+  color: #a29bfe;
+  border: 1px solid rgba(124, 92, 191, 0.3);
+}
+
+.perm-icon-secure {
+  color: #1dd1a1;
+}
+
+.perm-icon-warning {
+  color: #f39c12;
+}
+
+.perm-separator {
+  margin-top: 3px;
+  margin-bottom: 3px;
+  opacity: 0.25;
+}
+
+.perm-section-heading {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #777777;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-top: 1px;
+  margin-bottom: 2px;
+}
+
+.perm-row {
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: background-color 100ms ease;
+}
+
+.perm-row:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.perm-row-icon {
+  color: #888888;
+  -gtk-icon-size: 13px;
+}
+
+.perm-row-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: #dcdcdc;
+}
+
+.perm-switch {
+  transform: scale(0.72);
+}
+
+.perm-action-btn {
+  background-color: #161616;
+  border: 1px solid #262626;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 10.5px;
+  color: #cccccc;
+  transition: all 120ms ease;
+}
+
+.perm-action-btn:hover {
+  background-color: #222222;
+  border-color: #383838;
+  color: #ffffff;
+}
+
+.perm-btn-danger:hover {
+  background-color: rgba(255, 71, 87, 0.12);
+  border-color: rgba(255, 71, 87, 0.4);
+  color: #ff6b6b;
+}
+
+/* Botón de Configuración */
+.settings-btn {
+  background: transparent;
+  color: #c0c0c0;
+  border-radius: 5px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  margin: 0 1px;
+  border: 1px solid transparent;
+  transition: all 140ms ease;
+  -gtk-icon-size: 13px;
+}
+
+.settings-btn:hover {
+  background-color: #202020;
+  border-color: #303030;
+  color: #ffffff;
+}
+
+.settings-btn:active {
+  background-color: #282828;
+}
+
+/* ====================================================================
+   Barra de pestañas personalizada (Limpia, sin marcos negros ni bugs)
+   ==================================================================== */
+.nika-tabs-strip {
+  background-color: var(--nika-tabs-bg);
+  border-bottom: 1px solid var(--nika-border);
+  padding: 3px 6px;
+  min-height: 28px;
+}
+
+/* Píldora de cada pestaña */
+.tab-pill {
+  background-color: var(--nika-tab-pill-bg);
+  color: var(--nika-text-muted);
+  border-radius: 10px;
+  padding: 2px 8px;
+  margin: 0 2px;
+  border: 1px solid var(--nika-border);
+  transition: all 140ms ease;
+}
+
+.tab-pill:hover {
+  background-color: var(--nika-tab-pill-active);
+  color: var(--nika-text);
+}
+
+/* Pestaña activa con acento pastel */
+.tab-pill.active {
+  background-color: var(--nika-tab-pill-active);
+  color: var(--nika-text);
+  border: 1px solid var(--nika-accent);
+}
+
+/* Iconos y textos dentro de la pestaña */
+.tab-icon {
+  opacity: 0.7;
+}
+
+.tab-spinner {
+  min-width: 13px;
+  min-height: 13px;
+}
+
+.tab-title {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Botón cerrar pestaña (×) limpio y minimalista sin círculos */
+.tab-close-btn {
+  background: transparent;
+  color: var(--nika-text-muted);
+  border: none;
+  min-width: 14px;
+  min-height: 14px;
+  padding: 1px;
+  margin-left: 3px;
+  transition: all 120ms ease;
+}
+
+.tab-close-btn image {
+  color: var(--nika-text-muted);
+  opacity: 0.75;
+  -gtk-icon-size: 10px;
+}
+
+.tab-close-btn:hover {
+  background: transparent;
+  color: #ff4757;
+}
+
+.tab-close-btn:hover image {
+  color: #ff4757;
+  opacity: 1;
+}
+
+/* Botón nueva pestaña (+) */
+.new-tab-pill-btn {
+  background: transparent;
+  color: var(--nika-text);
+  border-radius: 8px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  margin-left: 2px;
+  border: 1px solid transparent;
+  transition: all 140ms ease;
+}
+
+.new-tab-pill-btn:hover {
+  background-color: var(--pastel-mint);
+  color: #1e3a24;
+}
+
+/* ====================================================================
+   Barra de progreso de carga minimalista ultra visible
+   ==================================================================== */
+progressbar.pastel-progress {
+  min-height: 3px;
+}
+
+progressbar.pastel-progress > trough {
+  background: transparent;
+  border: none;
+  min-height: 3px;
+}
+
+progressbar.pastel-progress > trough > progress {
+  background: linear-gradient(90deg, var(--pastel-lavender), var(--pastel-mint), var(--pastel-sky));
+  border-radius: 1px;
+  min-height: 3px;
+}
+
+/* ====================================================================
+   Soporte para Mover Pestañas (Arrastre y Menú Contextual)
+   ==================================================================== */
+.tab-pill.dragging {
+  opacity: 0.65;
+  border-color: var(--pastel-sky);
+  background-color: var(--pastel-lavender);
+}
+
+.tab-menu-popover {
+  background-color: var(--nika-entry-bg);
+  border: 1px solid var(--nika-border);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.tab-menu-btn {
+  background: transparent;
+  color: var(--nika-text);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11px;
+  border: none;
+  min-height: 24px;
+  transition: all 120ms ease;
+}
+
+.tab-menu-btn:hover {
+  background-color: var(--nika-tab-pill-bg);
+  color: var(--nika-accent);
+}
+
+/* ====================================================================
+   Ajustes Específicos para Modo Oscuro (100% Negros y Grises Neutros)
+   ==================================================================== */
+.dark-theme entry.omnibox:focus {
+  border-color: #666666;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.12);
+}
+
+.dark-theme .nav-button:hover {
+  background-color: #222222;
+  border-color: #333333;
+}
+
+.dark-theme .nav-button:active {
+  background-color: #303030;
+}
+
+.dark-theme .new-tab-pill-btn:hover {
+  background-color: #282828;
+  color: #ffffff;
+}
+
+.dark-theme .theme-toggle-btn {
+  background: #181818;
+  color: #f0f0f0;
+  border-color: #2a2a2a;
+}
+
+.dark-theme .theme-toggle-btn:hover {
+  background: #282828;
+  color: #ffffff;
+  border-color: #444444;
+}
+
+.dark-theme .shield-pill {
+  background-color: #1a1a1a;
+  color: #cccccc;
+  border: 1px solid #2e2e2e;
+}
+
+.dark-theme .tab-pill {
+  background-color: #181818;
+  color: #8a8a8a;
+  border: 1px solid #282828;
+}
+
+.dark-theme .tab-pill:hover {
+  background-color: #222222;
+  color: #f0f0f0;
+  border: 1px solid #383838;
+}
+
+.dark-theme .tab-pill.active {
+  background-color: #262626;
+  color: #ffffff;
+  border: 1px solid #4a4a4a;
+}
+
+.dark-theme .tab-close-btn {
+  background: transparent;
+  color: #888888;
+  border: none;
+}
+
+.dark-theme .tab-close-btn image {
+  color: #888888;
+  opacity: 0.75;
+  -gtk-icon-size: 10px;
+}
+
+.dark-theme .tab-close-btn:hover {
+  background: transparent;
+  color: #ff4757;
+}
+
+.dark-theme .tab-close-btn:hover image {
+  color: #ff4757;
+  opacity: 1;
+}
+
+/* ====================================================================
+   Botones de Control de Ventana (Cerrar × del navegador, Minimizar, etc.)
+   ==================================================================== */
+windowcontrols button {
+  background: transparent;
+  background-color: transparent;
+  color: var(--nika-text);
+  border: none;
+  border-radius: 4px;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 2px;
+  margin: 0 1px;
+  box-shadow: none;
+  transition: all 120ms ease;
+}
+
+windowcontrols button.close {
+  background: transparent;
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  color: #2c2a29;
+}
+
+windowcontrols button.close image {
+  color: #2c2a29;
+  opacity: 0.85;
+  -gtk-icon-size: 11px;
+}
+
+windowcontrols button.close:hover,
+windowcontrols button.close:active {
+  background: none;
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  color: #ff4757;
+}
+
+windowcontrols button.close:hover image,
+windowcontrols button.close:active image {
+  color: #ff4757;
+  opacity: 1;
+}
+
+.dark-theme windowcontrols button.close {
+  background: none;
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  color: #f0f0f0;
+}
+
+.dark-theme windowcontrols button.close image {
+  color: #f0f0f0;
+  opacity: 0.85;
+  -gtk-icon-size: 11px;
+}
+
+.dark-theme windowcontrols button.close:hover,
+.dark-theme windowcontrols button.close:active {
+  background: none;
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  color: #ff4757;
+}
+
+.dark-theme windowcontrols button.close:hover image,
+.dark-theme windowcontrols button.close:active image {
+  color: #ff4757;
+  opacity: 1;
+}
+
+.dark-theme .tab-pill.dragging {
+  opacity: 0.7;
+  border-color: #666666;
+  background-color: #303030;
+}
+
+.dark-theme .tab-menu-popover {
+  background-color: #141414;
+  border: 1px solid #2a2a2a;
+}
+
+.dark-theme .tab-menu-btn {
+  color: #e0e0e0;
+}
+
+.dark-theme .tab-menu-btn:hover {
+  background-color: #242424;
+  color: #ffffff;
+}
+
+.dark-theme progressbar.pastel-progress > trough > progress {
+  background: linear-gradient(90deg, #444444, #888888, #cccccc);
+}
+
+/* ====================================================================
+   Panel lateral flotante de pestañas verticales (Floating Left Sidebar)
+   Diseño compacto, esbelto (175px) y perfectamente proporcionado
+   ==================================================================== */
+.sidebar-edge-trigger {
+  background: transparent;
+  min-width: 6px;
+}
+
+/* Panel lateral cuando está fijado (Docked / Pinned) - Unificado con 1px de línea divisoria */
+.docked-sidebar,
+.dark-theme .docked-sidebar,
+box.docked-sidebar {
+  background-color: #0e0e0e;
+  background: #0e0e0e;
+  border-right: 1px solid #202020;
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  border-radius: 0px;
+  margin: 0px;
+  padding: 6px 5px 6px 5px;
+  min-width: 180px;
+  box-shadow: none;
+  transition: all 160ms ease;
+}
+
+.docked-sidebar .sidebar-header {
+  padding: 3px 4px 6px 4px;
+  border-bottom: 1px solid #1c1c1c;
+  margin-bottom: 4px;
+}
+
+/* Panel lateral en modo flotante auto-ocultable - 100% opaco sin transparencia */
+.floating-sidebar,
+.dark-theme .floating-sidebar,
+box.floating-sidebar {
+  background-color: #121212;
+  background: #121212;
+  border: 1px solid #282828;
+  border-radius: 12px;
+  margin: 6px 6px;
+  padding: 4px;
+  min-width: 175px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.95);
+  transition: all 160ms ease;
+}
+
+.sidebar-header {
+  padding: 2px 4px 4px 4px;
+  border-bottom: 1px solid var(--nika-border);
+  margin-bottom: 3px;
+}
+
+.dark-theme .sidebar-header {
+  border-bottom-color: #222222;
+}
+
+.sidebar-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--nika-text-muted);
+}
+
+.sidebar-action-btn {
+  background: transparent;
+  color: var(--nika-text);
+  border-radius: 5px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  transition: all 120ms ease;
+  -gtk-icon-size: 12px;
+}
+
+.sidebar-action-btn:hover {
+  background-color: var(--nika-tab-pill-bg);
+  border-color: var(--nika-border);
+}
+
+.dark-theme .sidebar-action-btn:hover {
+  background-color: #222222;
+  border-color: #333333;
+}
+
+.sidebar-action-btn.pinned {
+  color: #10ac84;
+}
+
+.sidebar-action-btn.pinned:hover {
+  color: #1dd1a1;
+}
+
+.tabs-scroller {
+  background: transparent;
+}
+
+.vertical-tabs-box {
+  padding: 1px 0;
+}
+
+/* Píldora de cada pestaña vertical */
+.vertical-tabs-box .tab-pill {
+  background-color: var(--nika-tab-pill-bg);
+  color: var(--nika-text-muted);
+  border-radius: 8px;
+  padding: 4px 6px;
+  margin: 1px 0;
+  border: 1px solid var(--nika-border);
+  min-height: 26px;
+  transition: all 120ms ease;
+}
+
+.vertical-tabs-box .tab-pill:hover {
+  background-color: var(--nika-tab-pill-active);
+  color: var(--nika-text);
+  border-color: var(--nika-accent);
+}
+
+.vertical-tabs-box .tab-pill.active {
+  background-color: var(--nika-tab-pill-active);
+  color: var(--nika-text);
+  border: 1.5px solid var(--nika-accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.dark-theme .vertical-tabs-box .tab-pill {
+  background-color: #181818;
+  color: #8a8a8a;
+  border: 1px solid #242424;
+}
+
+.dark-theme .vertical-tabs-box .tab-pill:hover {
+  background-color: #202020;
+  color: #f0f0f0;
+  border-color: #383838;
+}
+
+.dark-theme .vertical-tabs-box .tab-pill.active {
+  background-color: #242424;
+  color: #ffffff;
+  border: 1.5px solid #4a4a4a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ====================================================================
+   Gestor de Descargas (Diseño idéntico a la ventana de pestañas)
+   ==================================================================== */
+.download-btn {
+  background: transparent;
+  color: #c0c0c0;
+  border-radius: 6px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  margin: 0 1px;
+  border: 1px solid transparent;
+  transition: all 140ms ease;
+  -gtk-icon-size: 14px;
+}
+
+.download-btn:hover {
+  background-color: #222222;
+  border-color: #333333;
+  color: #ffffff;
+}
+
+.dark-theme .download-btn:hover {
+  background-color: #222222;
+  border-color: #333333;
+}
+
+.download-btn.download-animating {
+  color: #10ac84;
+}
+
+.download-btn.download-pulse {
+  color: #1dd1a1;
+  background-color: rgba(16, 172, 132, 0.25);
+  border-color: rgba(16, 172, 132, 0.45);
+  box-shadow: 0 0 10px rgba(16, 172, 132, 0.4);
+}
+
+.download-btn.download-completed {
+  color: #10ac84;
+}
+
+.floating-downloads-panel {
+  margin: 4px 4px 4px 2px;
+  min-width: 260px;
+}
+
+.download-pill {
+  min-height: 46px;
+  padding: 6px 8px;
+}
+
+/* Popover flotante de descargas - Idéntico al diseño del panel de pestañas */
+popover.downloads-popover {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+popover.downloads-popover > contents {
+  background-color: #121212;
+  color: #f0f0f0;
+  border: 1px solid #262626;
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.dark-theme popover.downloads-popover > contents {
+  background-color: #121212;
+  color: #f0f0f0;
+  border: 1px solid #262626;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+}
+
+popover.downloads-popover > arrow {
+  background: #121212;
+  border: 1px solid #262626;
+}
+
+.dark-theme popover.downloads-popover > arrow {
+  background: #121212;
+  border: 1px solid #262626;
+}
+
+.downloads-content-box {
+  padding: 0;
+}
+
+.downloads-popover-header {
+  padding: 2px 4px 4px 4px;
+  border-bottom: 1px solid #222222;
+  margin-bottom: 3px;
+}
+
+.downloads-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nika-text-muted);
+  letter-spacing: 0.2px;
+}
+
+.downloads-separator {
+  margin: 0;
+  min-height: 0;
+  background: transparent;
+  border: none;
+}
+
+.downloads-icon-btn {
+  background: transparent;
+  color: var(--nika-text);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  transition: all 120ms ease;
+  -gtk-icon-size: 13px;
+}
+
+.downloads-icon-btn:hover {
+  background-color: #222222;
+  border-color: #333333;
+}
+
+.downloads-empty-label {
+  font-size: 11px;
+  color: var(--nika-text-muted);
+  padding: 16px 8px;
+}
+
+.downloads-list {
+  padding: 1px 0;
+}
+
+/* Fila de cada descarga: idéntica a la píldora de pestaña */
+.download-row {
+  background-color: #181818;
+  color: var(--nika-text-muted);
+  border-radius: 8px;
+  padding: 5px 8px;
+  margin: 2px 0;
+  border: 1px solid #242424;
+  transition: all 120ms ease;
+}
+
+.download-row:hover {
+  background-color: #202020;
+  color: #f0f0f0;
+  border-color: #383838;
+}
+
+.download-file-icon {
+  color: var(--nika-accent);
+  min-width: 18px;
+  min-height: 18px;
+}
+
+.download-file-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #f0f0f0;
+}
+
+.download-status-label {
+  font-size: 10px;
+  color: #8a8a8a;
+}
+
+.download-progress-bar {
+  min-height: 3px;
+  margin-top: 3px;
+}
+
+.download-progress-bar > trough {
+  background: rgba(128, 128, 128, 0.2);
+  border-radius: 2px;
+  min-height: 3px;
+  border: none;
+}
+
+.download-progress-bar > trough > progress {
+  background: #10ac84;
+  border-radius: 2px;
+  min-height: 3px;
+}
+
+.download-cancel-btn,
+.download-open-btn {
+  background: transparent;
+  color: #8a8a8a;
+  border: 1px solid transparent;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 1px;
+  border-radius: 4px;
+  transition: all 120ms ease;
+  -gtk-icon-size: 11px;
+}
+
+.download-cancel-btn:hover {
+  color: #ff4757;
+  background-color: rgba(255, 71, 87, 0.15);
+}
+
+.download-open-btn:hover {
+  color: #10ac84;
+  background-color: rgba(16, 172, 132, 0.15);
+}
+
+/* ====================================================================
+   Ventana de Configuración de Nika (DNS, Privacidad, Preferencias)
+   ==================================================================== */
+window.nika-preferences-window,
+.nika-preferences-dialog,
+preferencesdialog,
+dialog-window,
+dialog,
+dialog.background,
+dialog.bottom-sheet {
+  background-color: #121212;
+  color: #f0f0f0;
+  opacity: 1.0;
+}
+
+.nika-preferences-dialog > contents,
+preferencesdialog > contents,
+.nika-preferences-dialog sheet,
+preferencesdialog sheet {
+  background-color: #121212;
+}
+
+.nika-preferences-window headerbar,
+.nika-preferences-dialog headerbar {
+  background-color: #161616;
+  border-bottom: 1px solid #242424;
+}
+
+.nika-preferences-window preferencespage,
+.nika-preferences-dialog preferencespage {
+  background-color: #121212;
+}
+
+.nika-preferences-window list,
+.nika-preferences-dialog list {
+  background-color: #1a1a1a;
+  border: 1px solid #262626;
+  border-radius: 10px;
+}
+
+.nika-preferences-window row,
+.nika-preferences-dialog row {
+  color: #f0f0f0;
+}
+
+.nika-preferences-window entry,
+.nika-preferences-dialog entry {
+  background-color: #161616;
+  color: #f0f0f0;
+  border: 1px solid #282828;
+}
+
+/* ====================================================================
+   Sección de Pestañas de Incógnito (Separador y Estilos)
+   ==================================================================== */
+.incognito-sidebar-section {
+  margin-top: 6px;
+  padding-top: 2px;
+}
+
+.incognito-divider {
+  background: #252525;
+  min-height: 1px;
+  margin: 4px 6px 6px 6px;
+  opacity: 0.9;
+}
+
+.incognito-header-row {
+  padding: 2px 8px 4px 8px;
+  color: #999999;
+}
+
+.incognito-icon {
+  -gtk-icon-size: 13px;
+  color: #aaaaaa;
+}
+
+.incognito-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #888888;
+}
+
+.tab-pill.incognito-tab {
+  border-left: 2px solid #444444;
+}
+
+.tab-pill.incognito-tab.active {
+  background: #252525;
+  border-left: 2px solid #e0e0e0;
+}
+
+/* ====================================================================
+   Barra Flotante de Búsqueda en Página (Ctrl + F)
+   ==================================================================== */
+.floating-find-card {
+  background: rgba(18, 18, 18, 0.96);
+  border: 1px solid #282828;
+  border-radius: 9px;
+  padding: 4px 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+}
+
+.find-entry {
+  background: #141414;
+  color: #f0f0f0;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  font-size: 12px;
+  min-height: 24px;
+  padding: 2px 8px;
+}
+
+.find-entry:focus {
+  border-color: #555555;
+}
+
+.find-count-label {
+  font-size: 11px;
+  color: #8a8a8a;
+  margin: 0 6px;
+  min-width: 48px;
+}
+
+.find-btn {
+  background: transparent;
+  color: #aaaaaa;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  -gtk-icon-size: 12px;
+  transition: all 120ms ease;
+}
+
+.find-btn:hover {
+  background: #282828;
+  color: #ffffff;
+  border-color: #383838;
+}
+
+.find-btn:active {
+  background: #333333;
+}
+
+/* ====================================================================
+   Toast Flotante de Zoom (Ctrl + / Ctrl - / Ctrl 0)
+   ==================================================================== */
+.zoom-toast-label {
+  background: rgba(22, 22, 22, 0.95);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 16px;
+  border: 1px solid #333333;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65);
+}

@@ -1,0 +1,92 @@
+mod app;
+mod browser;
+mod downloads;
+pub mod i18n;
+pub mod passwords;
+mod privacy;
+mod search;
+mod settings;
+mod theme;
+mod ui;
+
+use app::BrowserApp;
+use libadwaita as adw;
+use libadwaita::prelude::*;
+use std::path::PathBuf;
+use theme::ThemeManager;
+
+fn main() -> glib::ExitCode {
+    // Configurar ruta de códecs GStreamer locales si existen (~/.local/lib/gstreamer-1.0)
+    let local_gst_path = glib::home_dir().join(".local/lib/gstreamer-1.0");
+    if local_gst_path.exists() {
+        if let Some(existing) = std::env::var_os("GST_PLUGIN_PATH") {
+            let mut paths = std::env::split_paths(&existing).collect::<Vec<_>>();
+            if !paths.iter().any(|p| p == &local_gst_path) {
+                paths.insert(0, local_gst_path);
+            }
+            if let Ok(new_val) = std::env::join_paths(paths) {
+                unsafe {
+                    std::env::set_var("GST_PLUGIN_PATH", new_val);
+                }
+            }
+        } else {
+            unsafe {
+                std::env::set_var("GST_PLUGIN_PATH", &local_gst_path);
+            }
+        }
+    }
+
+    // Inicializar Libadwaita
+    adw::init().expect("Error al inicializar Libadwaita");
+
+    // Crear aplicación GTK4 / Libadwaita
+    let app = adw::Application::builder()
+        .application_id("org.nika.browser")
+        .build();
+
+    app.connect_startup(|_| {
+        // Encontrar directorio de recursos
+        let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        let project_dir = if manifest_dir.join("resources").exists() {
+            manifest_dir
+        } else {
+            current_dir
+        };
+
+        let css_path = project_dir.join("resources/styles/pastel.css");
+        let icons_path = project_dir.join("resources/icons");
+
+        // Cargar estilos personalizados
+        ThemeManager::load_css(&css_path);
+
+        // Registrar iconos vectoriales y logos personalizados de Nika Browser
+        if let Some(display) = gtk4::gdk::Display::default() {
+            let icon_theme = gtk4::IconTheme::for_display(&display);
+            icon_theme.add_search_path(&icons_path);
+            icon_theme.add_search_path(icons_path.join("hicolor"));
+            let user_icons = glib::home_dir().join(".local/share/icons");
+            if user_icons.exists() {
+                icon_theme.add_search_path(&user_icons);
+            }
+        }
+
+        // Establecer icono predeterminado de la aplicación
+        gtk4::Window::set_default_icon_name("nika-browser");
+    });
+
+    app.connect_activate(|application| {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let project_dir = if manifest_dir.join("resources").exists() {
+            manifest_dir
+        } else {
+            std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+        };
+
+        let browser = BrowserApp::new(application, project_dir);
+        browser.present();
+    });
+
+    app.run()
+}

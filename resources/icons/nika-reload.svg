@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 24 24"
+   width="24"
+   height="24"
+   fill="none"
+   stroke="currentColor"
+   stroke-width="1.05"
+   stroke-linecap="round"
+   stroke-linejoin="round"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="reload_thin.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="currentColor"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1" />
+  <path
+     style="baseline-shift:baseline;display:inline;overflow:visible;vector-effect:none;fill:currentColor;stroke:none;stroke-linecap:butt;stroke-linejoin:miter;enable-background:accumulate;stop-color:currentColor;stop-opacity:1;opacity:1"
+     d="M 12.443359,2.8769531 C 11.447821,2.8473025 10.451419,2.9837349 9.5039063,3.2734375 5.7138546,4.4322479 2.6329861,8.0674729 3.4394531,13.021484 c 0.7009174,4.305636 4.4834753,7.437562 8.8437499,7.320313 4.360359,-0.117251 7.971364,-3.447606 8.439453,-7.785156 a 0.52499998,0.52499998 0 0 0 -0.466797,-0.578125 0.52499998,0.52499998 0 0 0 -0.578125,0.464843 c -0.412562,3.823016 -3.580926,6.746273 -7.423828,6.84961 C 8.4110901,19.396303 5.0943926,16.648758 4.4765625,12.853516 3.7500188,8.3904614 6.443949,5.3086361 9.8105469,4.2792969 13.177145,3.2499576 17.131659,4.2977097 19.023437,8.4199219 A 0.52499998,0.52499998 0 0 0 19.71875,8.6777344 0.52499998,0.52499998 0 0 0 19.976562,7.9804687 C 18.402472,4.5505031 15.429974,2.9659051 12.443359,2.8769531 Z"
+     id="path1" />
+  <path
+     style="baseline-shift:baseline;display:inline;overflow:visible;vector-effect:none;fill:currentColor;stroke:none;stroke-linecap:butt;stroke-linejoin:miter;enable-background:accumulate;stop-color:currentColor;stop-opacity:1;opacity:1"
+     d="m 19.5,3.2753906 a 0.52499998,0.52499998 0 0 0 -0.525391,0.5253907 v 3.8749999 h -3.875 a 0.52499998,0.52499998 0 0 0 -0.52539,0.5234376 0.52499998,0.52499998 0 0 0 0.52539,0.5253906 H 19.5 A 0.52505248,0.52505248 0 0 0 20.025391,8.1992188 V 3.8007813 A 0.52499998,0.52499998 0 0 0 19.5,3.2753906 Z"
+     id="polyline1" />
+</svg>
