@@ -39,6 +39,7 @@ pub struct BrowserApp {
     pub site_permissions: SitePermissionsManager,
     pub permissions_popover: Rc<PermissionsPopover>,
     pub translation_popover: Rc<crate::ui::TranslationPopover>,
+    pub active_media_page: Rc<RefCell<Option<adw::TabPage>>>,
 }
 
 impl BrowserApp {
@@ -186,6 +187,7 @@ impl BrowserApp {
         let site_permissions = SitePermissionsManager::new();
         let permissions_popover = Rc::new(PermissionsPopover::new(&window, site_permissions.clone()));
         let translation_popover = Rc::new(crate::ui::TranslationPopover::new(&sidebar.translate_btn, settings.clone()));
+        let active_media_page = Rc::new(RefCell::new(None));
 
         let browser = Rc::new(Self {
             window: window.clone(),
@@ -206,6 +208,7 @@ impl BrowserApp {
             site_permissions: site_permissions.clone(),
             permissions_popover: permissions_popover.clone(),
             translation_popover: translation_popover.clone(),
+            active_media_page,
         });
 
         // Aplicar idioma inicial configurado a toda la interfaz
@@ -686,6 +689,7 @@ impl BrowserApp {
             move |gesture, _, _, _| {
                 let button = gesture.current_button();
                 if button == gtk4::gdk::BUTTON_SECONDARY {
+                    browser.sidebar.on_popover_opened();
                     browser.translation_popover.popup();
                 } else if button == gtk4::gdk::BUTTON_PRIMARY {
                     browser.toggle_page_translation();
@@ -693,6 +697,127 @@ impl BrowserApp {
             }
         ));
         browser.sidebar.translate_btn.add_controller(trans_gesture);
+
+        browser.translation_popover.popover.connect_closed(clone!(
+            #[weak]
+            browser,
+            move |_| {
+                browser.sidebar.on_popover_closed();
+            }
+        ));
+
+        // Conectar botones del reproductor multimedia en barra lateral
+        let b_play = browser.clone();
+        browser.sidebar.media_player.play_btn.connect_clicked(move |_| {
+            b_play.toggle_media_playback();
+        });
+
+        let b_prev = browser.clone();
+        browser.sidebar.media_player.prev_btn.connect_clicked(move |_| {
+            b_prev.skip_media_track(false);
+        });
+
+        let b_next = browser.clone();
+        browser.sidebar.media_player.next_btn.connect_clicked(move |_| {
+            b_next.skip_media_track(true);
+        });
+
+        let b_mute = browser.clone();
+        browser.sidebar.media_player.mute_btn.connect_clicked(move |_| {
+            b_mute.toggle_media_mute();
+        });
+
+        let b_switch = browser.clone();
+        let info_click = gtk4::GestureClick::new();
+        info_click.connect_pressed(move |_, _, _, _| {
+            b_switch.switch_to_media_tab();
+        });
+        browser.sidebar.media_player.info_box.add_controller(info_click);
+
+        // Periódico para refrescar metadatos y estado del reproductor si hay medios reproduciéndose
+        let b_media_poll = browser.clone();
+        glib::timeout_add_local(std::time::Duration::from_millis(1500), move || {
+            let tabs = b_media_poll.tabs.borrow();
+            // Buscar la pestaña activa o cualquiera que esté sonando/reproduciendo
+            let candidate = if let Some(ref p) = *b_media_poll.active_media_page.borrow() {
+                tabs.iter().find(|t| t.page == *p)
+            } else {
+                tabs.iter().find(|t| t.webview.is_playing_audio())
+            }.or_else(|| {
+                // Si no hay ninguna con audio sonando, revisar la pestaña seleccionada actualmente
+                if let Some(sel) = b_media_poll.tab_view.selected_page() {
+                    tabs.iter().find(|t| t.page == sel)
+                } else {
+                    None
+                }
+            });
+
+            if let Some(tab) = candidate {
+                let mp = b_media_poll.sidebar.media_player.clone();
+                let is_playing_audio = tab.webview.is_playing_audio();
+                let is_muted = tab.webview.is_muted();
+                let page = tab.page.clone();
+                let active_page_rc = b_media_poll.active_media_page.clone();
+
+                let js = r#"
+                    (function() {
+                        let media = document.querySelector('video, audio');
+                        let yt = document.getElementById('movie_player');
+                        let yt_playing = yt && typeof yt.getPlayerState === 'function' && yt.getPlayerState() === 1;
+                        let media_playing = media && !media.paused && media.currentTime > 0;
+                        let has_active_media = yt_playing || media_playing;
+
+                        let title = "";
+                        let artist = "";
+                        if (navigator.mediaSession && navigator.mediaSession.metadata) {
+                            title = navigator.mediaSession.metadata.title || "";
+                            artist = navigator.mediaSession.metadata.artist || "";
+                        }
+                        if (!title) {
+                            title = document.title || "";
+                            title = title.replace(/\s*-\s*YouTube$/, '').replace(/\s*-\s*Spotify$/, '');
+                        }
+                        if (!artist) {
+                            artist = window.location.hostname.replace(/^www\./, '');
+                        }
+
+                        let paused = true;
+                        if (yt && typeof yt.getPlayerState === 'function') {
+                            paused = yt.getPlayerState() !== 1;
+                        } else if (media) {
+                            paused = media.paused;
+                        }
+
+                        return JSON.stringify({
+                            has_media: has_active_media,
+                            title: title,
+                            artist: artist,
+                            paused: paused
+                        });
+                    })()
+                "#;
+
+                tab.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, move |res| {
+                    if let Ok(val) = res {
+                        let json_str = val.to_str();
+                        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                            let has_media = parsed["has_media"].as_bool().unwrap_or(false) || is_playing_audio;
+                            if has_media {
+                                *active_page_rc.borrow_mut() = Some(page);
+                                let title = parsed["title"].as_str().unwrap_or("").trim();
+                                let artist = parsed["artist"].as_str().unwrap_or("").trim();
+                                let paused = parsed["paused"].as_bool().unwrap_or(false);
+                                mp.set_info(title, artist, paused, is_muted);
+                                mp.show();
+                            }
+                        }
+                    }
+                });
+            }
+            glib::ControlFlow::Continue
+        });
+
+
 
         // Botones de navegación
         browser.header.btn_back.connect_clicked(clone!(
@@ -759,6 +884,12 @@ impl BrowserApp {
                 browser.save_session();
                 browser.update_header_security_state();
                 browser.update_translate_button_state();
+                if let Some(tab) = browser.get_active_tab() {
+                    let u = tab.current_url.borrow().clone();
+                    if !u.starts_with("nika://home") && !u.is_empty() {
+                        tab.webview.grab_focus();
+                    }
+                }
                 if browser.find_bar.revealer.reveals_child() {
                     let q = browser.find_bar.entry.text();
                     if !q.is_empty() {
@@ -801,6 +932,13 @@ impl BrowserApp {
 
                     let has_incognito = browser.tabs.borrow().iter().any(|t| t.is_incognito);
                     browser.sidebar.incognito_section.set_visible(has_incognito);
+
+                    if let Some(ref active_page) = *browser.active_media_page.borrow() {
+                        if active_page == page {
+                            *browser.active_media_page.borrow_mut() = None;
+                            browser.sidebar.media_player.hide();
+                        }
+                    }
 
                     tab_view.close_page_finish(page, true);
                 } else {
@@ -940,6 +1078,8 @@ impl BrowserApp {
 
                 // Alt + Shift + T: Opciones de traducción
                 if is_alt && is_shift && (keyval == gtk4::gdk::Key::t || keyval == gtk4::gdk::Key::T) {
+                    browser.sidebar.revealer.set_reveal_child(true);
+                    browser.sidebar.on_popover_opened();
                     browser.translation_popover.popup();
                     return glib::Propagation::Stop;
                 }
@@ -1084,10 +1224,56 @@ impl BrowserApp {
         SidebarComponents::attach_tab_drag_and_context_menu(
             &new_tab,
             self.tabs.clone(),
-            self.sidebar.normal_tabs_box.clone(),
-            self.sidebar.incognito_tabs_box.clone(),
+            &self.sidebar,
             self.tab_view.clone(),
         );
+
+        let page_audio = new_tab.page.clone();
+        let tabs_for_audio = self.tabs.clone();
+        let active_media_rc = self.active_media_page.clone();
+        let media_player_rc = self.sidebar.media_player.clone();
+
+        new_tab.webview.connect_is_playing_audio_notify(clone!(
+            #[strong]
+            page_audio,
+            #[strong]
+            tabs_for_audio,
+            #[strong]
+            active_media_rc,
+            #[strong]
+            media_player_rc,
+            move |view| {
+                let playing = view.is_playing_audio();
+                if playing {
+                    *active_media_rc.borrow_mut() = Some(page_audio.clone());
+                    Self::sync_media_metadata_from_view(view, &media_player_rc);
+                    media_player_rc.show();
+                } else {
+                    let has_other_playing = {
+                        let tabs = tabs_for_audio.borrow();
+                        tabs.iter().any(|t| t.page != page_audio && t.webview.is_playing_audio())
+                    };
+                    if !has_other_playing {
+                        let mp = media_player_rc.clone();
+                        let act = active_media_rc.clone();
+                        let tabs_check = tabs_for_audio.clone();
+                        glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
+                            let still_playing = tabs_check.borrow().iter().any(|t| t.webview.is_playing_audio());
+                            if !still_playing {
+                                mp.hide();
+                                *act.borrow_mut() = None;
+                            }
+                        });
+                    } else {
+                        let tabs = tabs_for_audio.borrow();
+                        if let Some(other) = tabs.iter().find(|t| t.page != page_audio && t.webview.is_playing_audio()) {
+                            *active_media_rc.borrow_mut() = Some(other.page.clone());
+                            Self::sync_media_metadata_from_view(&other.webview, &media_player_rc);
+                        }
+                    }
+                }
+            }
+        ));
 
         if is_incognito {
             self.sidebar.incognito_tabs_box.append(&new_tab.tab_pill);
@@ -1193,8 +1379,13 @@ impl BrowserApp {
                     (idx + len - 1) % len
                 };
                 let target_page = tabs[next_idx].page.clone();
+                let webview = tabs[next_idx].webview.clone();
+                let url = tabs[next_idx].current_url.borrow().clone();
                 drop(tabs);
                 self.tab_view.set_selected_page(&target_page);
+                if !url.starts_with("nika://home") && !url.is_empty() {
+                    webview.grab_focus();
+                }
             }
         }
     }
@@ -1511,5 +1702,216 @@ impl BrowserApp {
                 }));
             }
         }
+    }
+
+    /// Obtiene la pestaña multimedia activa (la última que reprodujo audio o la que esté sonando)
+    pub fn get_active_media_tab(&self) -> Option<BrowserTab> {
+        let tabs = self.tabs.borrow();
+        if let Some(ref page) = *self.active_media_page.borrow() {
+            if let Some(tab) = tabs.iter().find(|t| t.page == *page) {
+                return Some(BrowserTab {
+                    webview: tab.webview.clone(),
+                    page: tab.page.clone(),
+                    current_url: tab.current_url.clone(),
+                    tab_pill: tab.tab_pill.clone(),
+                    spinner: tab.spinner.clone(),
+                    icon: tab.icon.clone(),
+                    title_label: tab.title_label.clone(),
+                    is_loading: tab.is_loading.clone(),
+                    is_dark: tab.is_dark.clone(),
+                    settings: tab.settings.clone(),
+                    password_vault: tab.password_vault.clone(),
+                    is_incognito: tab.is_incognito,
+                    zoom_level: tab.zoom_level.clone(),
+                    is_translated: tab.is_translated.clone(),
+                    original_url: tab.original_url.clone(),
+                });
+            }
+        }
+        if let Some(tab) = tabs.iter().find(|t| t.webview.is_playing_audio()) {
+            return Some(BrowserTab {
+                webview: tab.webview.clone(),
+                page: tab.page.clone(),
+                current_url: tab.current_url.clone(),
+                tab_pill: tab.tab_pill.clone(),
+                spinner: tab.spinner.clone(),
+                icon: tab.icon.clone(),
+                title_label: tab.title_label.clone(),
+                is_loading: tab.is_loading.clone(),
+                is_dark: tab.is_dark.clone(),
+                settings: tab.settings.clone(),
+                password_vault: tab.password_vault.clone(),
+                is_incognito: tab.is_incognito,
+                zoom_level: tab.zoom_level.clone(),
+                is_translated: tab.is_translated.clone(),
+                original_url: tab.original_url.clone(),
+            });
+        }
+        None
+    }
+
+    /// Enfoca y cambia a la pestaña que está reproduciendo el contenido multimedia
+    pub fn switch_to_media_tab(&self) {
+        if let Some(tab) = self.get_active_media_tab() {
+            self.tab_view.set_selected_page(&tab.page);
+            tab.webview.grab_focus();
+        }
+    }
+
+    /// Alterna reproducción/pausa en la pestaña multimedia
+    pub fn toggle_media_playback(&self) {
+        if let Some(tab) = self.get_active_media_tab() {
+            let mp = self.sidebar.media_player.clone();
+            let js = r#"
+                (function() {
+                    let largeBtn = document.querySelector('.ytp-large-play-button');
+                    if (largeBtn && largeBtn.offsetParent !== null) {
+                        largeBtn.click();
+                        return false;
+                    }
+                    let yt = document.getElementById('movie_player');
+                    if (yt && typeof yt.getPlayerState === 'function') {
+                        let state = yt.getPlayerState();
+                        if (state === 1) {
+                            yt.pauseVideo();
+                            return true;
+                        } else {
+                            yt.playVideo();
+                            return false;
+                        }
+                    }
+                    let media = document.querySelector('video, audio');
+                    if (media) {
+                        if (media.paused) {
+                            media.play();
+                            return false;
+                        } else {
+                            media.pause();
+                            return true;
+                        }
+                    }
+                    return false;
+                })()
+            "#;
+            tab.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, move |res| {
+                if let Ok(val) = res {
+                    let is_paused = val.to_str() == "true";
+                    mp.set_playing_state(!is_paused);
+                }
+            });
+        }
+    }
+
+    /// Salta hacia adelante o atrás en el contenido multimedia (o siguiente/anterior pista)
+    pub fn skip_media_track(&self, forward: bool) {
+        if let Some(tab) = self.get_active_media_tab() {
+            let js = if forward {
+                r#"
+                    (function() {
+                        let nextBtn = document.querySelector('.ytp-next-button, button[data-testid="control-button-skip-forward"], .play-controls__next');
+                        if (nextBtn) {
+                            nextBtn.click();
+                        } else {
+                            let media = document.querySelector('video, audio');
+                            if (media) { media.currentTime += 10; }
+                        }
+                    })()
+                "#
+            } else {
+                r#"
+                    (function() {
+                        let prevBtn = document.querySelector('.ytp-prev-button, button[data-testid="control-button-skip-back"], .play-controls__prev');
+                        if (prevBtn) {
+                            prevBtn.click();
+                        } else {
+                            let media = document.querySelector('video, audio');
+                            if (media) { media.currentTime = Math.max(0, media.currentTime - 10); }
+                        }
+                    })()
+                "#
+            };
+            tab.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+            let mp = self.sidebar.media_player.clone();
+            let view = tab.webview.clone();
+            glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
+                Self::sync_media_metadata_from_view(&view, &mp);
+            });
+        }
+    }
+
+    /// Alterna el silencio de audio de la pestaña multimedia
+    pub fn toggle_media_mute(&self) {
+        if let Some(tab) = self.get_active_media_tab() {
+            let current = tab.webview.is_muted();
+            let new_muted = !current;
+            tab.webview.set_is_muted(new_muted);
+            self.sidebar.media_player.set_muted_state(new_muted);
+        }
+    }
+
+    /// Consulta y sincroniza metadatos multimedia (título, canal/artista, estado) desde la página web
+    pub fn sync_media_metadata_from_view(view: &webkit6::WebView, media_player: &Rc<crate::ui::SidebarMediaPlayer>) {
+        let is_muted = view.is_muted();
+        let mp = media_player.clone();
+        let fallback_title = view.title().map(|t| t.to_string()).unwrap_or_default();
+        let fallback_host = view.uri().map(|u| {
+            u.strip_prefix("https://")
+                .or_else(|| u.strip_prefix("http://"))
+                .and_then(|s| s.split('/').next())
+                .unwrap_or("Web Media")
+                .replace("www.", "")
+        }).unwrap_or_else(|| "Web Media".to_string());
+
+        let js = r#"
+            (function() {
+                let title = "";
+                let artist = "";
+                let paused = false;
+
+                if (navigator.mediaSession && navigator.mediaSession.metadata) {
+                    title = navigator.mediaSession.metadata.title || "";
+                    artist = navigator.mediaSession.metadata.artist || "";
+                }
+
+                let media = document.querySelector('video, audio');
+                if (media) {
+                    paused = media.paused;
+                }
+
+                if (!title) {
+                    title = document.title || "";
+                    title = title.replace(/\s*-\s*YouTube$/, '').replace(/\s*-\s*Spotify$/, '');
+                }
+
+                if (!artist) {
+                    artist = window.location.hostname.replace(/^www\./, '');
+                }
+
+                return JSON.stringify({
+                    title: title,
+                    artist: artist,
+                    paused: paused
+                });
+            })()
+        "#;
+
+        view.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, move |res| {
+            if let Ok(val) = res {
+                let json_str = val.to_str();
+                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                    let mut title = parsed["title"].as_str().unwrap_or("").trim().to_string();
+                    let mut artist = parsed["artist"].as_str().unwrap_or("").trim().to_string();
+                    let paused = parsed["paused"].as_bool().unwrap_or(false);
+
+                    if title.is_empty() {
+                        title = fallback_title;
+                    }
+                    if artist.is_empty() {
+                        artist = fallback_host;
+                    }
+                    mp.set_info(&title, &artist, paused, is_muted);
+                }
+            }
+        });
     }
 }

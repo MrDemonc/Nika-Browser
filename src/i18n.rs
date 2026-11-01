@@ -64,6 +64,17 @@ pub fn tr(lang: &str, key: &'static str) -> &'static str {
         "close_tab" => if is_en { "Close tab" } else { "Cerrar pestaña" },
         "duplicate_tab" => if is_en { "Duplicate tab" } else { "Duplicar pestaña" },
         "close_other_tabs" => if is_en { "Close other tabs" } else { "Cerrar otras pestañas" },
+        "media_now_playing" => if is_en { "NOW PLAYING" } else { "REPRODUCIENDO" },
+        "media_paused" => if is_en { "PAUSED" } else { "PAUSADO" },
+        "media_play" => if is_en { "Play" } else { "Reproducir" },
+        "media_pause" => if is_en { "Pause" } else { "Pausar" },
+        "media_prev" => if is_en { "Rewind 10s / Previous" } else { "Retroceder 10s / Anterior" },
+        "media_next" => if is_en { "Fast-forward 10s / Next" } else { "Adelantar 10s / Siguiente" },
+        "media_mute" => if is_en { "Mute" } else { "Silenciar" },
+        "media_unmute" => if is_en { "Unmute" } else { "Reactivar sonido" },
+        "media_switch_tab" => if is_en { "Click to switch to tab" } else { "Clic para ir a la pestaña" },
+        "media_hide" => if is_en { "Hide player" } else { "Ocultar reproductor" },
+
 
         // ==========================================
         // Gestor de Descargas / Downloads

@@ -21,6 +21,9 @@ pub struct SidebarComponents {
     pub incognito_tabs_box: gtk4::Box,
     pub auto_hide_enabled: Rc<RefCell<bool>>,
     pub on_pin_toggled: Rc<RefCell<Option<Box<dyn Fn(bool)>>>>,
+    pub is_popover_open: Rc<RefCell<bool>>,
+    pub is_pointer_inside: Rc<RefCell<bool>>,
+    pub media_player: Rc<crate::ui::SidebarMediaPlayer>,
 }
 
 impl SidebarComponents {
@@ -28,6 +31,11 @@ impl SidebarComponents {
         let initial_auto_hide = settings.borrow().sidebar_auto_hide;
         let auto_hide_enabled = Rc::new(RefCell::new(initial_auto_hide));
         let on_pin_toggled: Rc<RefCell<Option<Box<dyn Fn(bool)>>>> = Rc::new(RefCell::new(None));
+        let is_popover_open = Rc::new(RefCell::new(false));
+        let is_pointer_inside = Rc::new(RefCell::new(false));
+
+        let initial_lang = settings.borrow().language.clone();
+        let media_player = Rc::new(crate::ui::SidebarMediaPlayer::new(&initial_lang));
 
         let revealer = gtk4::Revealer::new();
         revealer.set_transition_type(gtk4::RevealerTransitionType::SlideRight);
@@ -74,7 +82,6 @@ impl SidebarComponents {
         let translate_btn = gtk4::Button::from_icon_name("nika-translate-symbolic");
         translate_btn.add_css_class("sidebar-action-btn");
         translate_btn.add_css_class("translate-btn");
-        let initial_lang = settings.borrow().language.clone();
         translate_btn.set_tooltip_text(Some(crate::i18n::tr(&initial_lang, "nav_translate")));
 
         sidebar_header.append(&sidebar_title);
@@ -134,6 +141,7 @@ impl SidebarComponents {
 
         sidebar_card.append(&sidebar_header);
         sidebar_card.append(&tabs_scroll);
+        sidebar_card.append(&media_player.container);
         revealer.set_child(Some(&sidebar_card));
 
         // Franja sensible en el extremo izquierdo
@@ -159,16 +167,27 @@ impl SidebarComponents {
         ));
         edge_trigger.add_controller(motion_edge);
 
-        // Motion controller para auto-ocultar
+        // Motion controller para auto-ocultar (respeta menús y popovers abiertos)
         let motion_sidebar = gtk4::EventControllerMotion::new();
         let auto_hide_clone = auto_hide_enabled.clone();
         let revealer_leave = revealer.clone();
+        let is_pop_clone = is_popover_open.clone();
+        let is_ptr_leave = is_pointer_inside.clone();
+
+        let is_ptr_enter = is_pointer_inside.clone();
+        motion_sidebar.connect_enter(move |_, _, _| {
+            *is_ptr_enter.borrow_mut() = true;
+        });
+
         motion_sidebar.connect_leave(move |_| {
+            *is_ptr_leave.borrow_mut() = false;
             if *auto_hide_clone.borrow() {
                 let r_clone = revealer_leave.clone();
                 let a_clone = auto_hide_clone.clone();
-                glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
-                    if *a_clone.borrow() {
+                let pop_clone = is_pop_clone.clone();
+                let ptr_clone = is_ptr_leave.clone();
+                glib::timeout_add_local_once(std::time::Duration::from_millis(350), move || {
+                    if *a_clone.borrow() && !*pop_clone.borrow() && !*ptr_clone.borrow() {
                         r_clone.set_reveal_child(false);
                     }
                 });
@@ -247,6 +266,9 @@ impl SidebarComponents {
             incognito_tabs_box,
             auto_hide_enabled,
             on_pin_toggled,
+            is_popover_open,
+            is_pointer_inside,
+            media_player,
         }
     }
 
@@ -255,7 +277,26 @@ impl SidebarComponents {
         *self.on_pin_toggled.borrow_mut() = Some(Box::new(callback));
     }
 
-    /// Actualiza el modo auto-hide programáticamente (ej. desde ajustes)
+    pub fn on_popover_opened(&self) {
+        *self.is_popover_open.borrow_mut() = true;
+    }
+
+    pub fn on_popover_closed(&self) {
+        *self.is_popover_open.borrow_mut() = false;
+        if *self.auto_hide_enabled.borrow() && !*self.is_pointer_inside.borrow() {
+            let r = self.revealer.clone();
+            let a = self.auto_hide_enabled.clone();
+            let ptr = self.is_pointer_inside.clone();
+            let pop = self.is_popover_open.clone();
+            glib::timeout_add_local_once(std::time::Duration::from_millis(350), move || {
+                if *a.borrow() && !*ptr.borrow() && !*pop.borrow() {
+                    r.set_reveal_child(false);
+                }
+            });
+        }
+    }
+
+    /// Establece el modo de auto-ocultación del panel
     pub fn set_auto_hide(&self, is_auto: bool) {
         *self.auto_hide_enabled.borrow_mut() = is_auto;
         if is_auto {
@@ -289,30 +330,58 @@ impl SidebarComponents {
         } else {
             self.pin_btn.set_tooltip_text(Some(tr(lang, "sidebar_pin")));
         }
+        self.media_player.update_language(lang);
     }
 
-    /// Conecta soporte de arrastre vertical y menú contextual
+    /// Conecta soporte de arrastre vertical con hueco visual (slot) y menú contextual
     pub fn attach_tab_drag_and_context_menu(
         tab: &BrowserTab,
         tabs: Rc<RefCell<Vec<BrowserTab>>>,
-        normal_tabs_box: gtk4::Box,
-        incognito_tabs_box: gtk4::Box,
+        sidebar: &SidebarComponents,
         tab_view: adw::TabView,
     ) {
         let pill = &tab.tab_pill;
         let page = &tab.page;
+        let is_incog = tab.is_incognito;
 
         let drag_gesture = gtk4::GestureDrag::new();
-        let last_offset = Rc::new(RefCell::new(0.0));
+        let target_slot_idx: Rc<RefCell<Option<usize>>> = Rc::new(RefCell::new(None));
+        let initial_tab_idx: Rc<RefCell<usize>> = Rc::new(RefCell::new(0));
+
+        let drop_indicator = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
+        drop_indicator.add_css_class("tab-drop-slot");
+        drop_indicator.set_height_request(28);
+
+        let parent_box = if is_incog {
+            sidebar.incognito_tabs_box.clone()
+        } else {
+            sidebar.normal_tabs_box.clone()
+        };
+
+        let normal_box_clone = sidebar.normal_tabs_box.clone();
+        let incog_box_clone = sidebar.incognito_tabs_box.clone();
 
         drag_gesture.connect_drag_begin(clone!(
             #[weak]
             pill,
             #[strong]
-            last_offset,
+            tabs,
+            #[weak]
+            page,
+            #[strong]
+            initial_tab_idx,
+            #[strong]
+            target_slot_idx,
             move |_, _, _| {
-                *last_offset.borrow_mut() = 0.0;
-                pill.add_css_class("dragging");
+                *target_slot_idx.borrow_mut() = None;
+                let tabs_borrow = tabs.borrow();
+                let initial = tabs_borrow
+                    .iter()
+                    .filter(|t| t.is_incognito == is_incog)
+                    .position(|t| t.page == page)
+                    .unwrap_or(0);
+                *initial_tab_idx.borrow_mut() = initial;
+                pill.add_css_class("tab-dragging");
             }
         ));
 
@@ -320,23 +389,47 @@ impl SidebarComponents {
             #[strong]
             tabs,
             #[strong]
-            normal_tabs_box,
+            parent_box,
             #[strong]
-            incognito_tabs_box,
+            drop_indicator,
             #[strong]
-            tab_view,
-            #[weak]
-            page,
+            initial_tab_idx,
             #[strong]
-            last_offset,
+            target_slot_idx,
             move |_, _, offset_y| {
-                let prev = *last_offset.borrow();
-                if offset_y - prev > 34.0 {
-                    move_tab_internal(&tabs, &normal_tabs_box, &incognito_tabs_box, &tab_view, &page, 1);
-                    *last_offset.borrow_mut() = offset_y;
-                } else if offset_y - prev < -34.0 {
-                    move_tab_internal(&tabs, &normal_tabs_box, &incognito_tabs_box, &tab_view, &page, -1);
-                    *last_offset.borrow_mut() = offset_y;
+                let initial = *initial_tab_idx.borrow();
+                let sibling_pills: Vec<gtk4::Box> = {
+                    let tabs_borrow = tabs.borrow();
+                    tabs_borrow
+                        .iter()
+                        .filter(|t| t.is_incognito == is_incog)
+                        .map(|t| t.tab_pill.clone())
+                        .collect()
+                };
+                let n = sibling_pills.len();
+                if n <= 1 {
+                    return;
+                }
+                let steps = (offset_y / 34.0).round() as i32;
+                let target = (initial as i32 + steps).clamp(0, (n - 1) as i32) as usize;
+
+                if target != initial {
+                    *target_slot_idx.borrow_mut() = Some(target);
+                    if drop_indicator.parent().is_none() {
+                        parent_box.append(&drop_indicator);
+                    }
+                    if target > initial {
+                        parent_box.reorder_child_after(&drop_indicator, Some(&sibling_pills[target]));
+                    } else if target == 0 {
+                        parent_box.reorder_child_after(&drop_indicator, None::<&gtk4::Widget>);
+                    } else {
+                        parent_box.reorder_child_after(&drop_indicator, Some(&sibling_pills[target - 1]));
+                    }
+                } else {
+                    *target_slot_idx.borrow_mut() = None;
+                    if drop_indicator.parent().is_some() {
+                        parent_box.remove(&drop_indicator);
+                    }
                 }
             }
         ));
@@ -344,27 +437,79 @@ impl SidebarComponents {
         drag_gesture.connect_drag_end(clone!(
             #[weak]
             pill,
+            #[strong]
+            tabs,
+            #[strong]
+            normal_box_clone,
+            #[strong]
+            incog_box_clone,
+            #[strong]
+            tab_view,
+            #[weak]
+            page,
+            #[strong]
+            drop_indicator,
+            #[strong]
+            parent_box,
+            #[strong]
+            initial_tab_idx,
+            #[strong]
+            target_slot_idx,
             move |_, _, _| {
+                pill.remove_css_class("tab-dragging");
                 pill.remove_css_class("dragging");
+                if drop_indicator.parent().is_some() {
+                    parent_box.remove(&drop_indicator);
+                }
+                if let Some(target) = *target_slot_idx.borrow() {
+                    let initial = *initial_tab_idx.borrow();
+                    if target != initial {
+                        let delta = target as i32 - initial as i32;
+                        move_tab_internal(
+                            &tabs,
+                            &normal_box_clone,
+                            &incog_box_clone,
+                            &tab_view,
+                            &page,
+                            delta,
+                        );
+                    }
+                }
+                *target_slot_idx.borrow_mut() = None;
             }
         ));
         pill.add_controller(drag_gesture);
 
         let right_click = gtk4::GestureClick::new();
         right_click.set_button(3);
+        let normal_box_rc = sidebar.normal_tabs_box.clone();
+        let incog_box_rc = sidebar.incognito_tabs_box.clone();
+        let is_pop_open = sidebar.is_popover_open.clone();
+        let is_ptr_inside = sidebar.is_pointer_inside.clone();
+        let auto_hide_en = sidebar.auto_hide_enabled.clone();
+        let rev = sidebar.revealer.clone();
+
         right_click.connect_pressed(clone!(
             #[strong]
             tabs,
             #[strong]
-            normal_tabs_box,
+            normal_box_rc,
             #[strong]
-            incognito_tabs_box,
+            incog_box_rc,
             #[strong]
             tab_view,
             #[weak]
             page,
             #[weak]
             pill,
+            #[strong]
+            is_pop_open,
+            #[strong]
+            is_ptr_inside,
+            #[strong]
+            auto_hide_en,
+            #[strong]
+            rev,
             move |_, _, _, _| {
                 let popover = gtk4::Popover::new();
                 popover.add_css_class("tab-menu-popover");
@@ -378,9 +523,9 @@ impl SidebarComponents {
                     #[strong]
                     tabs,
                     #[strong]
-                    normal_tabs_box,
+                    normal_box_rc,
                     #[strong]
-                    incognito_tabs_box,
+                    incog_box_rc,
                     #[strong]
                     tab_view,
                     #[weak]
@@ -388,7 +533,7 @@ impl SidebarComponents {
                     #[weak]
                     popover,
                     move |_| {
-                        move_tab_internal(&tabs, &normal_tabs_box, &incognito_tabs_box, &tab_view, &page, -1);
+                        move_tab_internal(&tabs, &normal_box_rc, &incog_box_rc, &tab_view, &page, -1);
                         popover.popdown();
                     }
                 ));
@@ -399,9 +544,9 @@ impl SidebarComponents {
                     #[strong]
                     tabs,
                     #[strong]
-                    normal_tabs_box,
+                    normal_box_rc,
                     #[strong]
-                    incognito_tabs_box,
+                    incog_box_rc,
                     #[strong]
                     tab_view,
                     #[weak]
@@ -409,7 +554,7 @@ impl SidebarComponents {
                     #[weak]
                     popover,
                     move |_| {
-                        move_tab_internal(&tabs, &normal_tabs_box, &incognito_tabs_box, &tab_view, &page, 1);
+                        move_tab_internal(&tabs, &normal_box_rc, &incog_box_rc, &tab_view, &page, 1);
                         popover.popdown();
                     }
                 ));
@@ -437,6 +582,33 @@ impl SidebarComponents {
                 menu_box.append(&btn_close);
 
                 popover.set_child(Some(&menu_box));
+
+                *is_pop_open.borrow_mut() = true;
+                popover.connect_closed(clone!(
+                    #[strong]
+                    is_pop_open,
+                    #[strong]
+                    is_ptr_inside,
+                    #[strong]
+                    auto_hide_en,
+                    #[strong]
+                    rev,
+                    move |_| {
+                        *is_pop_open.borrow_mut() = false;
+                        if *auto_hide_en.borrow() && !*is_ptr_inside.borrow() {
+                            let r = rev.clone();
+                            let a = auto_hide_en.clone();
+                            let ptr = is_ptr_inside.clone();
+                            let pop = is_pop_open.clone();
+                            glib::timeout_add_local_once(std::time::Duration::from_millis(350), move || {
+                                if *a.borrow() && !*ptr.borrow() && !*pop.borrow() {
+                                    r.set_reveal_child(false);
+                                }
+                            });
+                        }
+                    }
+                ));
+
                 popover.popup();
             }
         ));
