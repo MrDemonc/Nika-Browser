@@ -15,7 +15,7 @@ pub struct SidebarComponents {
     pub pin_btn: gtk4::Button,
     pub new_tab_btn: gtk4::Button,
     pub new_incognito_tab_btn: gtk4::Button,
-    pub sidebar_collapse_btn: gtk4::Button,
+    pub translate_btn: gtk4::Button,
     pub normal_tabs_box: gtk4::Box,
     pub incognito_section: gtk4::Box,
     pub incognito_tabs_box: gtk4::Box,
@@ -71,15 +71,17 @@ impl SidebarComponents {
         new_incognito_tab_btn.add_css_class("sidebar-action-btn");
         new_incognito_tab_btn.set_tooltip_text(Some("Nueva pestaña de incógnito (Ctrl+Shift+N)"));
 
-        let sidebar_collapse_btn = gtk4::Button::from_icon_name("nika-back-symbolic");
-        sidebar_collapse_btn.add_css_class("sidebar-action-btn");
-        sidebar_collapse_btn.set_tooltip_text(Some("Ocultar barra de pestañas (Ctrl+B)"));
+        let translate_btn = gtk4::Button::from_icon_name("nika-translate-symbolic");
+        translate_btn.add_css_class("sidebar-action-btn");
+        translate_btn.add_css_class("translate-btn");
+        let initial_lang = settings.borrow().language.clone();
+        translate_btn.set_tooltip_text(Some(crate::i18n::tr(&initial_lang, "nav_translate")));
 
         sidebar_header.append(&sidebar_title);
         sidebar_header.append(&pin_btn);
         sidebar_header.append(&new_tab_btn);
         sidebar_header.append(&new_incognito_tab_btn);
-        sidebar_header.append(&sidebar_collapse_btn);
+        sidebar_header.append(&translate_btn);
 
         let tabs_scroll = gtk4::ScrolledWindow::builder()
             .hscrollbar_policy(gtk4::PolicyType::Never)
@@ -239,7 +241,7 @@ impl SidebarComponents {
             pin_btn,
             new_tab_btn,
             new_incognito_tab_btn,
-            sidebar_collapse_btn,
+            translate_btn,
             normal_tabs_box,
             incognito_section,
             incognito_tabs_box,
@@ -281,7 +283,7 @@ impl SidebarComponents {
         use crate::i18n::tr;
         self.new_tab_btn.set_tooltip_text(Some(tr(lang, "new_tab")));
         self.new_incognito_tab_btn.set_tooltip_text(Some(tr(lang, "new_incognito_tab")));
-        self.sidebar_collapse_btn.set_tooltip_text(Some(tr(lang, "collapse_sidebar")));
+        self.translate_btn.set_tooltip_text(Some(tr(lang, "nav_translate")));
         if *self.auto_hide_enabled.borrow() {
             self.pin_btn.set_tooltip_text(Some(tr(lang, "sidebar_auto_hide")));
         } else {

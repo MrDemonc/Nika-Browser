@@ -1225,3 +1225,88 @@ preferencesdialog sheet {
   border: 1px solid #333333;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65);
 }
+
+/* ====================================================================
+   Botón e Indicador de Traducción de Google
+   ==================================================================== */
+.translate-btn {
+  color: #c0c0c0;
+  border-radius: 6px;
+  transition: all 140ms ease;
+}
+
+.translate-btn:hover {
+  background-color: #222222;
+  color: #ffffff;
+}
+
+.dark-theme .translate-btn:hover {
+  background-color: #222222;
+  color: #ffffff;
+}
+
+.translate-btn.translate-active {
+  color: #48dbfb;
+  background-color: rgba(72, 219, 251, 0.18);
+  border: 1px solid rgba(72, 219, 251, 0.45);
+}
+
+.dark-theme .translate-btn.translate-active {
+  color: #48dbfb;
+  background-color: rgba(72, 219, 251, 0.22);
+  border: 1px solid rgba(72, 219, 251, 0.5);
+}
+
+/* Popover de configuración de traducción */
+popover.translation-popover > contents {
+  background-color: #181818;
+  border: 1px solid #333333;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: 10px 12px;
+  min-width: 250px;
+}
+
+.dark-theme popover.translation-popover > contents {
+  background-color: #181818;
+  border-color: #333333;
+}
+
+popover.translation-popover > arrow {
+  background-color: #181818;
+  border-color: #333333;
+}
+
+.translation-content-box {
+  margin: 2px;
+}
+
+.translation-header-row {
+  margin-bottom: 2px;
+}
+
+.translation-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.translation-label {
+  font-size: 12px;
+  color: #d0d0d0;
+}
+
+.translation-dropdown {
+  background-color: #222222;
+  border: 1px solid #383838;
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 2px 6px;
+}
+
+.translation-action-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+}

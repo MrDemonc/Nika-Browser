@@ -67,6 +67,10 @@ fn default_time_format() -> String {
     "24h".to_string()
 }
 
+fn default_target_lang() -> String {
+    "es".to_string()
+}
+
 /// Configuración persistente del navegador Nika
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserSettings {
@@ -96,6 +100,10 @@ pub struct BrowserSettings {
     pub webrtc_leak_protection: bool,
     #[serde(default)]
     pub clear_cache_on_exit: bool,
+    #[serde(default)]
+    pub auto_translate: bool,
+    #[serde(default = "default_target_lang")]
+    pub translate_target_lang: String,
 }
 
 impl Default for BrowserSettings {
@@ -114,6 +122,8 @@ impl Default for BrowserSettings {
             block_insecure_content: true,
             webrtc_leak_protection: true,
             clear_cache_on_exit: false,
+            auto_translate: false,
+            translate_target_lang: "es".to_string(),
         }
     }
 }

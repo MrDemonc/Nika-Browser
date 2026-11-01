@@ -30,6 +30,8 @@ pub struct BrowserTab {
     pub password_vault: Rc<crate::passwords::PasswordVault>,
     pub is_incognito: bool,
     pub zoom_level: Rc<RefCell<f64>>,
+    pub is_translated: Rc<RefCell<bool>>,
+    pub original_url: Rc<RefCell<Option<String>>>,
 }
 
 impl BrowserTab {
@@ -347,6 +349,8 @@ impl BrowserTab {
         let current_url = Rc::new(RefCell::new(String::new()));
         let is_loading = Rc::new(RefCell::new(false));
         let is_dark_rc = Rc::new(RefCell::new(is_dark));
+        let is_translated_rc = Rc::new(RefCell::new(false));
+        let original_url_rc: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
 
         let tab_pill = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
         tab_pill.add_css_class("tab-pill");
@@ -576,6 +580,10 @@ impl BrowserTab {
             #[strong]
             is_dark_rc,
             #[strong]
+            is_translated_rc,
+            #[strong]
+            original_url_rc,
+            #[strong]
             settings,
             #[strong]
             is_incognito,
@@ -598,10 +606,16 @@ impl BrowserTab {
                     }
                     LoadEvent::Committed => {
                         if let Some(uri) = view.uri() {
-                            *current_url.borrow_mut() = uri.to_string();
+                            let uri_str = uri.to_string();
+                            *current_url.borrow_mut() = uri_str.clone();
                             if is_active {
-                                if !uri.starts_with("file://") && uri != "http://localhost/" && uri != "nika://home" {
-                                    omnibox.set_text(&uri);
+                                if !uri_str.starts_with("file://") && uri_str != "http://localhost/" && uri_str != "nika://home" {
+                                    let display_uri = if let Some(ref o) = *original_url_rc.borrow() {
+                                        o.clone()
+                                    } else {
+                                        uri_str
+                                    };
+                                    omnibox.set_text(&display_uri);
                                 } else {
                                     omnibox.set_text("");
                                 }
@@ -706,6 +720,41 @@ impl BrowserTab {
                                 "if (document.body) { document.body.classList.remove('dark'); }"
                             };
                             view.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+                        } else if uri_str.contains(".translate.goog") || uri_str.starts_with("https://translate.google.com/translate") {
+                            *is_translated_rc.borrow_mut() = true;
+                        } else {
+                            // Revisar sugerencia automática de traducción si está habilitada
+                            let auto_trans = settings.borrow().auto_translate;
+                            if auto_trans && !*is_translated_rc.borrow() {
+                                let target_code = settings.borrow().translate_target_lang.clone();
+                                let target_clone = target_code.clone();
+                                let v_clone = view.clone();
+                                let curr_clone = current_url.clone();
+                                let is_trans_clone = is_translated_rc.clone();
+                                let orig_url_clone = original_url_rc.clone();
+
+                                view.evaluate_javascript(
+                                    "(document.documentElement.lang || document.querySelector('meta[http-equiv=\"content-language\"]')?.content || '').toLowerCase()",
+                                    None,
+                                    None,
+                                    None::<&gio::Cancellable>,
+                                    move |res| {
+                                        if let Ok(js_val) = res {
+                                            let doc_lang = js_val.to_str().to_string().trim().to_lowercase();
+                                            if !doc_lang.is_empty() && !doc_lang.starts_with(&target_clone.to_lowercase()) {
+                                                let curr = curr_clone.borrow().clone();
+                                                if !curr.is_empty() && !curr.starts_with("nika://") && !curr.starts_with("file://") {
+                                                    *orig_url_clone.borrow_mut() = Some(curr.clone());
+                                                    *is_trans_clone.borrow_mut() = true;
+                                                    let encoded: String = url::form_urlencoded::byte_serialize(curr.as_bytes()).collect();
+                                                    let trans_url = format!("https://translate.google.com/translate?sl=auto&tl={}&u={}", target_clone, encoded);
+                                                    v_clone.load_uri(&trans_url);
+                                                }
+                                            }
+                                        }
+                                    }
+                                );
+                            }
                         }
                     }
                     _ => {}
@@ -727,6 +776,8 @@ impl BrowserTab {
             password_vault: password_vault.clone(),
             is_incognito,
             zoom_level: Rc::new(RefCell::new(1.0)),
+            is_translated: is_translated_rc,
+            original_url: original_url_rc,
         };
 
         tab.load_uri(home_url);
@@ -841,6 +892,12 @@ impl BrowserTab {
             );
             self.webview.load_html(&html, Some("nika://home"));
         } else {
+            if !trimmed.contains(".translate.goog") && !trimmed.starts_with("https://translate.google.com/translate") {
+                *self.is_translated.borrow_mut() = false;
+                *self.original_url.borrow_mut() = None;
+            } else {
+                *self.is_translated.borrow_mut() = true;
+            }
             self.icon.set_icon_name(Some(if self.is_incognito { "nika-incognito-symbolic" } else { "web-browser-symbolic" }));
             FaviconManager::load_for_url(trimmed, &self.icon);
             let cleaned = PrivacyEngine::clean_url(trimmed);

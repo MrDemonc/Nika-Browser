@@ -38,6 +38,7 @@ pub struct BrowserApp {
     pub home_url: String,
     pub site_permissions: SitePermissionsManager,
     pub permissions_popover: Rc<PermissionsPopover>,
+    pub translation_popover: Rc<crate::ui::TranslationPopover>,
 }
 
 impl BrowserApp {
@@ -184,6 +185,7 @@ impl BrowserApp {
         let password_vault = Rc::new(PasswordVault::new());
         let site_permissions = SitePermissionsManager::new();
         let permissions_popover = Rc::new(PermissionsPopover::new(&window, site_permissions.clone()));
+        let translation_popover = Rc::new(crate::ui::TranslationPopover::new(&sidebar.translate_btn, settings.clone()));
 
         let browser = Rc::new(Self {
             window: window.clone(),
@@ -203,6 +205,7 @@ impl BrowserApp {
             home_url: home_url.clone(),
             site_permissions: site_permissions.clone(),
             permissions_popover: permissions_popover.clone(),
+            translation_popover: translation_popover.clone(),
         });
 
         // Aplicar idioma inicial configurado a toda la interfaz
@@ -596,7 +599,7 @@ impl BrowserApp {
         browser.header.omnibox.connect_icon_press(clone!(
             #[strong]
             browser,
-            move |entry, icon_pos| {
+            move |_entry, icon_pos| {
                 if icon_pos == gtk4::EntryIconPosition::Primary {
                     if let Some(tab) = browser.get_active_tab() {
                         let url = tab.current_url.borrow().clone();
@@ -605,30 +608,7 @@ impl BrowserApp {
                         browser.permissions_popover.popup();
                     }
                 } else if icon_pos == gtk4::EntryIconPosition::Secondary {
-                    let text = entry.text();
-                    let url_to_copy = if !text.is_empty() {
-                        text.to_string()
-                    } else if let Some(tab) = browser.get_active_tab() {
-                        tab.current_url.borrow().clone()
-                    } else {
-                        "nika://home".to_string()
-                    };
-
-                    entry.clipboard().set_text(&url_to_copy);
-                    entry.set_icon_from_icon_name(gtk4::EntryIconPosition::Secondary, Some("emblem-ok-symbolic"));
-                    entry.set_icon_tooltip_text(gtk4::EntryIconPosition::Secondary, Some("¡URL copiada!"));
-
-                    glib::timeout_add_local_once(
-                        std::time::Duration::from_millis(1500),
-                        clone!(
-                            #[weak]
-                            entry,
-                            move || {
-                                entry.set_icon_from_icon_name(gtk4::EntryIconPosition::Secondary, Some("nika-copy-symbolic"));
-                                entry.set_icon_tooltip_text(gtk4::EntryIconPosition::Secondary, Some("Copiar URL al portapapeles"));
-                            }
-                        ),
-                    );
+                    browser.copy_current_url_with_feedback();
                 }
             }
         ));
@@ -686,10 +666,33 @@ impl BrowserApp {
             s_rev.set_reveal_child(!cur);
         });
 
-        let s_rev_col = browser.sidebar.revealer.clone();
-        browser.sidebar.sidebar_collapse_btn.connect_clicked(move |_| {
-            s_rev_col.set_reveal_child(false);
+        // Conectar acciones del popover de traducción
+        let b_trans = browser.clone();
+        browser.translation_popover.set_on_translate(move |target_lang| {
+            b_trans.translate_active_page(&target_lang);
         });
+
+        let b_rest = browser.clone();
+        browser.translation_popover.set_on_restore(move || {
+            b_rest.restore_active_page_original();
+        });
+
+        // Clic izquierdo: Alternar traducción | Clic derecho: Opciones de traducción
+        let trans_gesture = gtk4::GestureClick::new();
+        trans_gesture.set_button(0);
+        trans_gesture.connect_pressed(clone!(
+            #[strong]
+            browser,
+            move |gesture, _, _, _| {
+                let button = gesture.current_button();
+                if button == gtk4::gdk::BUTTON_SECONDARY {
+                    browser.translation_popover.popup();
+                } else if button == gtk4::gdk::BUTTON_PRIMARY {
+                    browser.toggle_page_translation();
+                }
+            }
+        ));
+        browser.sidebar.translate_btn.add_controller(trans_gesture);
 
         // Botones de navegación
         browser.header.btn_back.connect_clicked(clone!(
@@ -755,6 +758,7 @@ impl BrowserApp {
                 browser.update_tabs_visual_state();
                 browser.save_session();
                 browser.update_header_security_state();
+                browser.update_translate_button_state();
                 if browser.find_bar.revealer.reveals_child() {
                     let q = browser.find_bar.entry.text();
                     if !q.is_empty() {
@@ -925,6 +929,24 @@ impl BrowserApp {
                         browser.permissions_popover.update_for_url(&url, &lang);
                         browser.permissions_popover.popup();
                     }
+                    return glib::Propagation::Stop;
+                }
+
+                // Ctrl + Shift + C: Copiar URL actual al portapapeles
+                if is_ctrl && is_shift && (keyval == gtk4::gdk::Key::c || keyval == gtk4::gdk::Key::C) {
+                    browser.copy_current_url_with_feedback();
+                    return glib::Propagation::Stop;
+                }
+
+                // Alt + Shift + T: Opciones de traducción
+                if is_alt && is_shift && (keyval == gtk4::gdk::Key::t || keyval == gtk4::gdk::Key::T) {
+                    browser.translation_popover.popup();
+                    return glib::Propagation::Stop;
+                }
+
+                // Alt + T: Alternar traducción de página
+                if is_alt && !is_ctrl && (keyval == gtk4::gdk::Key::t || keyval == gtk4::gdk::Key::T) {
+                    browser.toggle_page_translation();
                     return glib::Propagation::Stop;
                 }
 
@@ -1225,6 +1247,8 @@ impl BrowserApp {
         self.sidebar.update_language(lang);
         self.find_bar.update_language(lang);
         self.download_manager.update_language(lang);
+        self.translation_popover.update_language(lang);
+        self.update_translate_button_state();
 
         let tabs = self.tabs.borrow();
         for tab in tabs.iter() {
@@ -1268,6 +1292,8 @@ impl BrowserApp {
                         password_vault: tab.password_vault.clone(),
                         is_incognito: tab.is_incognito,
                         zoom_level: tab.zoom_level.clone(),
+                        is_translated: tab.is_translated.clone(),
+                        original_url: tab.original_url.clone(),
                     }));
                 }
             }
@@ -1328,6 +1354,132 @@ impl BrowserApp {
             wdm.clear(types, glib::TimeSpan::from_seconds(0), None::<&gio::Cancellable>, |_| {});
         }
         println!("[Nika] 🧹 Caché y almacenamiento temporal eliminados por seguridad.");
+    }
+
+    /// Copia la URL actual al portapapeles y anima el icono de feedback (✓)
+    pub fn copy_current_url_with_feedback(&self) {
+        let entry = &self.header.omnibox;
+        let text = entry.text();
+        let url_to_copy = if !text.is_empty() {
+            text.to_string()
+        } else if let Some(tab) = self.get_active_tab() {
+            tab.current_url.borrow().clone()
+        } else {
+            "nika://home".to_string()
+        };
+
+        let lang = self.settings.borrow().language.clone();
+        entry.clipboard().set_text(&url_to_copy);
+        entry.set_icon_from_icon_name(gtk4::EntryIconPosition::Secondary, Some("nika-check-symbolic"));
+        entry.set_icon_tooltip_text(gtk4::EntryIconPosition::Secondary, Some(crate::i18n::tr(&lang, "copied")));
+
+        let lang_clone = lang.clone();
+        glib::timeout_add_local_once(
+            std::time::Duration::from_millis(1500),
+            clone!(
+                #[weak]
+                entry,
+                move || {
+                    entry.set_icon_from_icon_name(gtk4::EntryIconPosition::Secondary, Some("nika-copy-symbolic"));
+                    entry.set_icon_tooltip_text(gtk4::EntryIconPosition::Secondary, Some(crate::i18n::tr(&lang_clone, "copy_url")));
+                }
+            ),
+        );
+    }
+
+    /// Actualiza el estado visual del botón de traducción según la pestaña activa
+    pub fn update_translate_button_state(&self) {
+        if let Some(tab) = self.get_active_tab() {
+            let url = tab.current_url.borrow().clone();
+            let is_trans = *tab.is_translated.borrow()
+                || url.contains(".translate.goog")
+                || url.starts_with("https://translate.google.com/translate");
+
+            let lang = self.settings.borrow().language.clone();
+            if is_trans {
+                self.sidebar.translate_btn.add_css_class("translate-active");
+                self.sidebar.translate_btn.set_tooltip_text(Some(crate::i18n::tr(&lang, "translate_active_tooltip")));
+            } else {
+                self.sidebar.translate_btn.remove_css_class("translate-active");
+                self.sidebar.translate_btn.set_tooltip_text(Some(crate::i18n::tr(&lang, "nav_translate")));
+            }
+        } else {
+            self.sidebar.translate_btn.remove_css_class("translate-active");
+        }
+    }
+
+    /// Alterna la traducción de la página actual con Google Translate
+    pub fn toggle_page_translation(&self) {
+        if let Some(tab) = self.get_active_tab() {
+            let current_url = tab.current_url.borrow().clone();
+            if current_url.starts_with("nika://") || current_url.starts_with("file://") || current_url == "about:blank" || current_url.is_empty() {
+                return;
+            }
+
+            let is_trans = *tab.is_translated.borrow()
+                || current_url.contains(".translate.goog")
+                || current_url.starts_with("https://translate.google.com/translate");
+
+            if is_trans {
+                self.restore_active_page_original();
+            } else {
+                let target = self.settings.borrow().translate_target_lang.clone();
+                self.translate_active_page(&target);
+            }
+        }
+    }
+
+    /// Traduce la página activa al idioma especificado usando Google Translate
+    pub fn translate_active_page(&self, target_lang: &str) {
+        if let Some(tab) = self.get_active_tab() {
+            let current_url = tab.current_url.borrow().clone();
+            if current_url.starts_with("nika://") || current_url.starts_with("file://") || current_url == "about:blank" || current_url.is_empty() {
+                return;
+            }
+
+            let base_url = if let Some(ref o) = *tab.original_url.borrow() {
+                o.clone()
+            } else {
+                current_url.clone()
+            };
+
+            *tab.original_url.borrow_mut() = Some(base_url.clone());
+            *tab.is_translated.borrow_mut() = true;
+            self.sidebar.translate_btn.add_css_class("translate-active");
+
+            let lang = self.settings.borrow().language.clone();
+            self.sidebar.translate_btn.set_tooltip_text(Some(crate::i18n::tr(&lang, "translate_active_tooltip")));
+
+            let encoded: String = url::form_urlencoded::byte_serialize(base_url.as_bytes()).collect();
+            let translate_url = format!("https://translate.google.com/translate?sl=auto&tl={}&u={}", target_lang, encoded);
+            tab.load_uri(&translate_url);
+        }
+    }
+
+    /// Restaura la página al idioma y URL original sin traducción
+    pub fn restore_active_page_original(&self) {
+        if let Some(tab) = self.get_active_tab() {
+            let current_url = tab.current_url.borrow().clone();
+            let orig = if let Some(ref o) = *tab.original_url.borrow() {
+                o.clone()
+            } else if let Ok(parsed) = url::Url::parse(&current_url) {
+                parsed.query_pairs()
+                    .find(|(k, _)| k == "u")
+                    .map(|(_, v)| v.to_string())
+                    .unwrap_or(current_url)
+            } else {
+                current_url
+            };
+
+            *tab.is_translated.borrow_mut() = false;
+            *tab.original_url.borrow_mut() = None;
+            self.sidebar.translate_btn.remove_css_class("translate-active");
+
+            let lang = self.settings.borrow().language.clone();
+            self.sidebar.translate_btn.set_tooltip_text(Some(crate::i18n::tr(&lang, "nav_translate")));
+
+            tab.load_uri(&orig);
+        }
     }
 
     /// Actualiza el icono de seguridad y permisos en la cabecera según la pestaña activa
