@@ -1,6 +1,7 @@
 use gtk4::prelude::*;
 use libadwaita as adw;
 
+#[derive(Clone)]
 pub struct HeaderComponents {
     pub header_bar: adw::HeaderBar,
     pub sidebar_toggle_btn: gtk4::Button,
@@ -8,6 +9,10 @@ pub struct HeaderComponents {
     pub btn_forward: gtk4::Button,
     pub reload_btn: gtk4::Button,
     pub btn_home: gtk4::Button,
+    pub media_revealer: gtk4::Revealer,
+    pub btn_media_prev: gtk4::Button,
+    pub btn_media_play: gtk4::Button,
+    pub btn_media_next: gtk4::Button,
     pub omnibox: gtk4::Entry,
     pub shield_btn: gtk4::Button,
     pub settings_btn: gtk4::Button,
@@ -40,12 +45,43 @@ impl HeaderComponents {
         btn_home.add_css_class("nav-button");
         btn_home.set_tooltip_text(Some("Inicio"));
 
+        // Controles multimedia compactos a la derecha del botón Inicio
+        let media_revealer = gtk4::Revealer::new();
+        media_revealer.set_transition_type(gtk4::RevealerTransitionType::SlideRight);
+        media_revealer.set_transition_duration(250);
+        media_revealer.set_reveal_child(false);
+
+        let media_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 1);
+        media_box.add_css_class("header-media-box");
+
+        let btn_media_prev = gtk4::Button::from_icon_name("nika-prev-symbolic");
+        btn_media_prev.add_css_class("nav-button");
+        btn_media_prev.add_css_class("header-media-btn");
+        btn_media_prev.set_tooltip_text(Some("Pista anterior"));
+
+        let btn_media_play = gtk4::Button::from_icon_name("nika-play-symbolic");
+        btn_media_play.add_css_class("nav-button");
+        btn_media_play.add_css_class("header-media-btn");
+        btn_media_play.add_css_class("header-media-play-btn");
+        btn_media_play.set_tooltip_text(Some("Reproducir / Pausar"));
+
+        let btn_media_next = gtk4::Button::from_icon_name("nika-next-symbolic");
+        btn_media_next.add_css_class("nav-button");
+        btn_media_next.add_css_class("header-media-btn");
+        btn_media_next.set_tooltip_text(Some("Siguiente pista"));
+
+        media_box.append(&btn_media_prev);
+        media_box.append(&btn_media_play);
+        media_box.append(&btn_media_next);
+        media_revealer.set_child(Some(&media_box));
+
         let nav_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 1);
         nav_box.append(&sidebar_toggle_btn);
         nav_box.append(&btn_back);
         nav_box.append(&btn_forward);
         nav_box.append(&reload_btn);
         nav_box.append(&btn_home);
+        nav_box.append(&media_revealer);
         header_bar.pack_start(&nav_box);
 
         // Omnibox compacto horizontal y verticalmente con icono de permisos y seguridad
@@ -88,20 +124,48 @@ impl HeaderComponents {
             btn_forward,
             reload_btn,
             btn_home,
+            media_revealer,
+            btn_media_prev,
+            btn_media_play,
+            btn_media_next,
             omnibox,
             shield_btn,
             settings_btn,
         }
     }
 
+    pub fn set_media_playing_state(&self, playing: bool) {
+        if playing {
+            self.btn_media_play.set_icon_name("nika-pause-symbolic");
+        } else {
+            self.btn_media_play.set_icon_name("nika-play-symbolic");
+        }
+    }
+
+    pub fn show_media_controls(&self) {
+        if !self.media_revealer.reveals_child() {
+            self.media_revealer.set_reveal_child(true);
+        }
+    }
+
+    pub fn hide_media_controls(&self) {
+        if self.media_revealer.reveals_child() {
+            self.media_revealer.set_reveal_child(false);
+        }
+    }
+
     /// Actualiza los textos y tooltips de los componentes de cabecera según el idioma
     pub fn update_language(&self, lang: &str) {
         use crate::i18n::tr;
+        let is_en = lang == "en";
         self.sidebar_toggle_btn.set_tooltip_text(Some(tr(lang, "nav_toggle_sidebar")));
         self.btn_back.set_tooltip_text(Some(tr(lang, "nav_back")));
         self.btn_forward.set_tooltip_text(Some(tr(lang, "nav_forward")));
         self.reload_btn.set_tooltip_text(Some(tr(lang, "nav_reload")));
         self.btn_home.set_tooltip_text(Some(tr(lang, "nav_home")));
+        self.btn_media_prev.set_tooltip_text(Some(if is_en { "Previous track" } else { "Pista anterior" }));
+        self.btn_media_play.set_tooltip_text(Some(if is_en { "Play / Pause" } else { "Reproducir / Pausar" }));
+        self.btn_media_next.set_tooltip_text(Some(if is_en { "Next track" } else { "Siguiente pista" }));
         self.omnibox.set_placeholder_text(Some(tr(lang, "omnibox_placeholder")));
         self.omnibox.set_primary_icon_tooltip_text(Some(tr(lang, "site_permissions_tooltip")));
         self.omnibox.set_secondary_icon_tooltip_text(Some(tr(lang, "copy_url")));

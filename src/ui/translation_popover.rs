@@ -42,7 +42,9 @@ impl TranslationPopover {
         let popover = gtk4::Popover::new();
         popover.set_parent(parent_btn);
         popover.add_css_class("translation-popover");
+        popover.set_has_arrow(false);
         popover.set_position(gtk4::PositionType::Right);
+        popover.set_offset(10, 0);
 
         let content_box = gtk4::Box::new(gtk4::Orientation::Vertical, 8);
         content_box.add_css_class("translation-content-box");

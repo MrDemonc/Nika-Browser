@@ -23,7 +23,6 @@ pub struct SidebarComponents {
     pub on_pin_toggled: Rc<RefCell<Option<Box<dyn Fn(bool)>>>>,
     pub is_popover_open: Rc<RefCell<bool>>,
     pub is_pointer_inside: Rc<RefCell<bool>>,
-    pub media_player: Rc<crate::ui::SidebarMediaPlayer>,
 }
 
 impl SidebarComponents {
@@ -35,7 +34,6 @@ impl SidebarComponents {
         let is_pointer_inside = Rc::new(RefCell::new(false));
 
         let initial_lang = settings.borrow().language.clone();
-        let media_player = Rc::new(crate::ui::SidebarMediaPlayer::new(&initial_lang));
 
         let revealer = gtk4::Revealer::new();
         revealer.set_transition_type(gtk4::RevealerTransitionType::SlideRight);
@@ -141,7 +139,6 @@ impl SidebarComponents {
 
         sidebar_card.append(&sidebar_header);
         sidebar_card.append(&tabs_scroll);
-        sidebar_card.append(&media_player.container);
         revealer.set_child(Some(&sidebar_card));
 
         // Franja sensible en el extremo izquierdo
@@ -268,7 +265,6 @@ impl SidebarComponents {
             on_pin_toggled,
             is_popover_open,
             is_pointer_inside,
-            media_player,
         }
     }
 
@@ -330,7 +326,6 @@ impl SidebarComponents {
         } else {
             self.pin_btn.set_tooltip_text(Some(tr(lang, "sidebar_pin")));
         }
-        self.media_player.update_language(lang);
     }
 
     /// Conecta soporte de arrastre vertical con hueco visual (slot) y menú contextual

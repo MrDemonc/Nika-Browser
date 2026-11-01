@@ -118,6 +118,47 @@ progressbar.pastel-progress > trough {
   background-color: #282828;
 }
 
+/* Controles multimedia compactos en la barra superior (a la derecha de Inicio) */
+.header-media-box {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 1px 2px;
+  margin-left: 5px;
+  margin-right: 3px;
+}
+
+.dark-theme .header-media-box {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.header-media-btn {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  margin: 0;
+  -gtk-icon-size: 12px;
+}
+
+.header-media-play-btn {
+  color: #48dbfb;
+}
+
+.header-media-play-btn:hover {
+  color: #0abde3;
+  background-color: rgba(72, 219, 251, 0.15);
+}
+
+.dark-theme .header-media-play-btn {
+  color: #48dbfb;
+}
+
+.dark-theme .header-media-play-btn:hover {
+  color: #0abde3;
+  background-color: rgba(72, 219, 251, 0.18);
+}
+
 /* Barra de direcciones / Omnibox compacta horizontalmente */
 entry.omnibox {
   background-color: var(--nika-entry-bg);
@@ -433,6 +474,34 @@ dialog.permissions-dialog > contents,
   opacity: 1;
 }
 
+/* Botón silenciar pestaña (🔊/🔇) */
+.tab-mute-btn {
+  background: transparent;
+  color: #48dbfb;
+  border: none;
+  min-width: 14px;
+  min-height: 14px;
+  padding: 1px;
+  margin-right: 2px;
+  transition: all 120ms ease;
+}
+
+.tab-mute-btn image {
+  color: #48dbfb;
+  opacity: 0.9;
+  -gtk-icon-size: 11px;
+}
+
+.tab-mute-btn:hover {
+  background: rgba(72, 219, 251, 0.15);
+  border-radius: 4px;
+}
+
+.tab-mute-btn:hover image {
+  color: #0abde3;
+  opacity: 1;
+}
+
 /* Botón nueva pestaña (+) */
 .new-tab-pill-btn {
   background: transparent;
@@ -579,6 +648,34 @@ progressbar.pastel-progress > trough > progress {
 
 .dark-theme .tab-close-btn:hover image {
   color: #ff4757;
+  opacity: 1;
+}
+
+/* Botón silenciar pestaña (🔊/🔇) */
+.tab-mute-btn {
+  background: transparent;
+  color: #48dbfb;
+  border: none;
+  min-width: 14px;
+  min-height: 14px;
+  padding: 1px;
+  margin-right: 2px;
+  transition: all 120ms ease;
+}
+
+.tab-mute-btn image {
+  color: #48dbfb;
+  opacity: 0.9;
+  -gtk-icon-size: 11px;
+}
+
+.tab-mute-btn:hover {
+  background: rgba(72, 219, 251, 0.15);
+  border-radius: 4px;
+}
+
+.tab-mute-btn:hover image {
+  color: #0abde3;
   opacity: 1;
 }
 

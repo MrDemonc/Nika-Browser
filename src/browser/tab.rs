@@ -16,6 +16,8 @@ pub const HOME_HTML: &str = include_str!("../../resources/home/index.html");
 pub const SETTINGS_HTML: &str = include_str!("../../resources/settings/index.html");
 pub const WELCOME_HTML: &str = include_str!("../../resources/welcome/index.html");
 
+#[allow(dead_code)]
+#[derive(Clone)]
 pub struct BrowserTab {
     pub webview: WebView,
     pub page: adw::TabPage,
@@ -32,6 +34,7 @@ pub struct BrowserTab {
     pub zoom_level: Rc<RefCell<f64>>,
     pub is_translated: Rc<RefCell<bool>>,
     pub original_url: Rc<RefCell<Option<String>>>,
+    pub mute_btn: gtk4::Button,
 }
 
 impl BrowserTab {
@@ -385,6 +388,56 @@ impl BrowserTab {
         title_label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
         title_label.set_max_width_chars(16);
 
+        let mute_btn = gtk4::Button::from_icon_name("nika-volume-symbolic");
+        mute_btn.add_css_class("tab-mute-btn");
+        mute_btn.set_visible(false);
+        mute_btn.set_tooltip_text(Some(if is_en { "Mute tab" } else { "Silenciar pestaña" }));
+
+        mute_btn.connect_clicked(clone!(
+            #[weak]
+            webview,
+            move |_| {
+                let is_muted = webview.is_muted();
+                webview.set_is_muted(!is_muted);
+            }
+        ));
+
+        let update_audio_ui = clone!(
+            #[weak]
+            mute_btn,
+            #[weak]
+            webview,
+            #[strong]
+            settings,
+            move || {
+                let playing = webview.is_playing_audio();
+                let muted = webview.is_muted();
+                let is_en = settings.borrow().language == "en";
+                if playing || muted {
+                    mute_btn.set_visible(true);
+                    if muted {
+                        mute_btn.set_icon_name("nika-volume-mute-symbolic");
+                        mute_btn.set_tooltip_text(Some(if is_en { "Unmute tab" } else { "Reactivar sonido" }));
+                    } else {
+                        mute_btn.set_icon_name("nika-volume-symbolic");
+                        mute_btn.set_tooltip_text(Some(if is_en { "Mute tab" } else { "Silenciar pestaña" }));
+                    }
+                } else {
+                    mute_btn.set_visible(false);
+                }
+            }
+        );
+
+        let u_play = update_audio_ui.clone();
+        webview.connect_is_playing_audio_notify(move |_| {
+            u_play();
+        });
+
+        let u_mute = update_audio_ui.clone();
+        webview.connect_notify_local(Some("is-muted"), move |_, _| {
+            u_mute();
+        });
+
         let close_btn = gtk4::Button::from_icon_name("nika-close-symbolic");
         close_btn.add_css_class("tab-close-btn");
         close_btn.set_tooltip_text(Some(if is_en { "Close tab" } else { "Cerrar pestaña" }));
@@ -428,6 +481,7 @@ impl BrowserTab {
         tab_pill.append(&spinner);
         tab_pill.append(&icon);
         tab_pill.append(&title_label);
+        tab_pill.append(&mute_btn);
         tab_pill.append(&close_btn);
 
         if let Some(find) = webview.find_controller() {
@@ -778,12 +832,31 @@ impl BrowserTab {
             zoom_level: Rc::new(RefCell::new(1.0)),
             is_translated: is_translated_rc,
             original_url: original_url_rc,
+            mute_btn,
         };
 
         tab.load_uri(home_url);
         tab.apply_theme_to_page(is_dark);
 
         tab
+    }
+
+    pub fn update_audio_state(&self) {
+        let playing = self.webview.is_playing_audio();
+        let muted = self.webview.is_muted();
+        let is_en = self.settings.borrow().language == "en";
+        if playing || muted {
+            self.mute_btn.set_visible(true);
+            if muted {
+                self.mute_btn.set_icon_name("nika-volume-mute-symbolic");
+                self.mute_btn.set_tooltip_text(Some(if is_en { "Unmute tab" } else { "Reactivar sonido" }));
+            } else {
+                self.mute_btn.set_icon_name("nika-volume-symbolic");
+                self.mute_btn.set_tooltip_text(Some(if is_en { "Mute tab" } else { "Silenciar pestaña" }));
+            }
+        } else {
+            self.mute_btn.set_visible(false);
+        }
     }
 
     pub fn zoom_in(&self) -> f64 {

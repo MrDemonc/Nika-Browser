@@ -11,6 +11,7 @@ pub use header::*;
 #[allow(unused_imports)]
 pub use permissions_popover::*;
 pub use sidebar::*;
+#[allow(unused_imports)]
 pub use sidebar_media_player::*;
 pub use translation_popover::*;
 pub use zoom_toast::*;

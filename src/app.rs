@@ -706,35 +706,23 @@ impl BrowserApp {
             }
         ));
 
-        // Conectar botones del reproductor multimedia en barra lateral
+        // Conectar botones del reproductor multimedia en barra superior
         let b_play = browser.clone();
-        browser.sidebar.media_player.play_btn.connect_clicked(move |_| {
+        browser.header.btn_media_play.connect_clicked(move |_| {
             b_play.toggle_media_playback();
         });
 
         let b_prev = browser.clone();
-        browser.sidebar.media_player.prev_btn.connect_clicked(move |_| {
+        browser.header.btn_media_prev.connect_clicked(move |_| {
             b_prev.skip_media_track(false);
         });
 
         let b_next = browser.clone();
-        browser.sidebar.media_player.next_btn.connect_clicked(move |_| {
+        browser.header.btn_media_next.connect_clicked(move |_| {
             b_next.skip_media_track(true);
         });
 
-        let b_mute = browser.clone();
-        browser.sidebar.media_player.mute_btn.connect_clicked(move |_| {
-            b_mute.toggle_media_mute();
-        });
-
-        let b_switch = browser.clone();
-        let info_click = gtk4::GestureClick::new();
-        info_click.connect_pressed(move |_, _, _, _| {
-            b_switch.switch_to_media_tab();
-        });
-        browser.sidebar.media_player.info_box.add_controller(info_click);
-
-        // Periódico para refrescar metadatos y estado del reproductor si hay medios reproduciéndose
+        // Periódico para refrescar estado de reproducción multimedia en la barra superior
         let b_media_poll = browser.clone();
         glib::timeout_add_local(std::time::Duration::from_millis(1500), move || {
             let tabs = b_media_poll.tabs.borrow();
@@ -753,9 +741,8 @@ impl BrowserApp {
             });
 
             if let Some(tab) = candidate {
-                let mp = b_media_poll.sidebar.media_player.clone();
+                let hdr = b_media_poll.header.clone();
                 let is_playing_audio = tab.webview.is_playing_audio();
-                let is_muted = tab.webview.is_muted();
                 let page = tab.page.clone();
                 let active_page_rc = b_media_poll.active_media_page.clone();
 
@@ -767,20 +754,6 @@ impl BrowserApp {
                         let media_playing = media && !media.paused && media.currentTime > 0;
                         let has_active_media = yt_playing || media_playing;
 
-                        let title = "";
-                        let artist = "";
-                        if (navigator.mediaSession && navigator.mediaSession.metadata) {
-                            title = navigator.mediaSession.metadata.title || "";
-                            artist = navigator.mediaSession.metadata.artist || "";
-                        }
-                        if (!title) {
-                            title = document.title || "";
-                            title = title.replace(/\s*-\s*YouTube$/, '').replace(/\s*-\s*Spotify$/, '');
-                        }
-                        if (!artist) {
-                            artist = window.location.hostname.replace(/^www\./, '');
-                        }
-
                         let paused = true;
                         if (yt && typeof yt.getPlayerState === 'function') {
                             paused = yt.getPlayerState() !== 1;
@@ -790,8 +763,6 @@ impl BrowserApp {
 
                         return JSON.stringify({
                             has_media: has_active_media,
-                            title: title,
-                            artist: artist,
                             paused: paused
                         });
                     })()
@@ -802,13 +773,11 @@ impl BrowserApp {
                         let json_str = val.to_str();
                         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str) {
                             let has_media = parsed["has_media"].as_bool().unwrap_or(false) || is_playing_audio;
+                            let paused = parsed["paused"].as_bool().unwrap_or(true);
                             if has_media {
                                 *active_page_rc.borrow_mut() = Some(page);
-                                let title = parsed["title"].as_str().unwrap_or("").trim();
-                                let artist = parsed["artist"].as_str().unwrap_or("").trim();
-                                let paused = parsed["paused"].as_bool().unwrap_or(false);
-                                mp.set_info(title, artist, paused, is_muted);
-                                mp.show();
+                                hdr.set_media_playing_state(!paused);
+                                hdr.show_media_controls();
                             }
                         }
                     }
@@ -936,7 +905,7 @@ impl BrowserApp {
                     if let Some(ref active_page) = *browser.active_media_page.borrow() {
                         if active_page == page {
                             *browser.active_media_page.borrow_mut() = None;
-                            browser.sidebar.media_player.hide();
+                            browser.header.hide_media_controls();
                         }
                     }
 
@@ -1231,7 +1200,7 @@ impl BrowserApp {
         let page_audio = new_tab.page.clone();
         let tabs_for_audio = self.tabs.clone();
         let active_media_rc = self.active_media_page.clone();
-        let media_player_rc = self.sidebar.media_player.clone();
+        let header_rc = self.header.clone();
 
         new_tab.webview.connect_is_playing_audio_notify(clone!(
             #[strong]
@@ -1241,26 +1210,27 @@ impl BrowserApp {
             #[strong]
             active_media_rc,
             #[strong]
-            media_player_rc,
+            header_rc,
             move |view| {
                 let playing = view.is_playing_audio();
                 if playing {
                     *active_media_rc.borrow_mut() = Some(page_audio.clone());
-                    Self::sync_media_metadata_from_view(view, &media_player_rc);
-                    media_player_rc.show();
+                    header_rc.set_media_playing_state(true);
+                    header_rc.show_media_controls();
                 } else {
                     let has_other_playing = {
                         let tabs = tabs_for_audio.borrow();
                         tabs.iter().any(|t| t.page != page_audio && t.webview.is_playing_audio())
                     };
                     if !has_other_playing {
-                        let mp = media_player_rc.clone();
+                        header_rc.set_media_playing_state(false);
+                        let hdr = header_rc.clone();
                         let act = active_media_rc.clone();
                         let tabs_check = tabs_for_audio.clone();
                         glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
                             let still_playing = tabs_check.borrow().iter().any(|t| t.webview.is_playing_audio());
                             if !still_playing {
-                                mp.hide();
+                                hdr.hide_media_controls();
                                 *act.borrow_mut() = None;
                             }
                         });
@@ -1268,7 +1238,8 @@ impl BrowserApp {
                         let tabs = tabs_for_audio.borrow();
                         if let Some(other) = tabs.iter().find(|t| t.page != page_audio && t.webview.is_playing_audio()) {
                             *active_media_rc.borrow_mut() = Some(other.page.clone());
-                            Self::sync_media_metadata_from_view(&other.webview, &media_player_rc);
+                            header_rc.set_media_playing_state(true);
+                            header_rc.show_media_controls();
                         }
                     }
                 }
@@ -1469,23 +1440,7 @@ impl BrowserApp {
             let tabs = self.tabs.borrow();
             for tab in tabs.iter() {
                 if tab.page == selected_page {
-                    return Some(Rc::new(BrowserTab {
-                        webview: tab.webview.clone(),
-                        page: tab.page.clone(),
-                        current_url: tab.current_url.clone(),
-                        tab_pill: tab.tab_pill.clone(),
-                        spinner: tab.spinner.clone(),
-                        icon: tab.icon.clone(),
-                        title_label: tab.title_label.clone(),
-                        is_loading: tab.is_loading.clone(),
-                        is_dark: tab.is_dark.clone(),
-                        settings: tab.settings.clone(),
-                        password_vault: tab.password_vault.clone(),
-                        is_incognito: tab.is_incognito,
-                        zoom_level: tab.zoom_level.clone(),
-                        is_translated: tab.is_translated.clone(),
-                        original_url: tab.original_url.clone(),
-                    }));
+                    return Some(Rc::new(tab.clone()));
                 }
             }
         }
@@ -1709,48 +1664,17 @@ impl BrowserApp {
         let tabs = self.tabs.borrow();
         if let Some(ref page) = *self.active_media_page.borrow() {
             if let Some(tab) = tabs.iter().find(|t| t.page == *page) {
-                return Some(BrowserTab {
-                    webview: tab.webview.clone(),
-                    page: tab.page.clone(),
-                    current_url: tab.current_url.clone(),
-                    tab_pill: tab.tab_pill.clone(),
-                    spinner: tab.spinner.clone(),
-                    icon: tab.icon.clone(),
-                    title_label: tab.title_label.clone(),
-                    is_loading: tab.is_loading.clone(),
-                    is_dark: tab.is_dark.clone(),
-                    settings: tab.settings.clone(),
-                    password_vault: tab.password_vault.clone(),
-                    is_incognito: tab.is_incognito,
-                    zoom_level: tab.zoom_level.clone(),
-                    is_translated: tab.is_translated.clone(),
-                    original_url: tab.original_url.clone(),
-                });
+                return Some(tab.clone());
             }
         }
         if let Some(tab) = tabs.iter().find(|t| t.webview.is_playing_audio()) {
-            return Some(BrowserTab {
-                webview: tab.webview.clone(),
-                page: tab.page.clone(),
-                current_url: tab.current_url.clone(),
-                tab_pill: tab.tab_pill.clone(),
-                spinner: tab.spinner.clone(),
-                icon: tab.icon.clone(),
-                title_label: tab.title_label.clone(),
-                is_loading: tab.is_loading.clone(),
-                is_dark: tab.is_dark.clone(),
-                settings: tab.settings.clone(),
-                password_vault: tab.password_vault.clone(),
-                is_incognito: tab.is_incognito,
-                zoom_level: tab.zoom_level.clone(),
-                is_translated: tab.is_translated.clone(),
-                original_url: tab.original_url.clone(),
-            });
+            return Some(tab.clone());
         }
         None
     }
 
     /// Enfoca y cambia a la pestaña que está reproduciendo el contenido multimedia
+    #[allow(dead_code)]
     pub fn switch_to_media_tab(&self) {
         if let Some(tab) = self.get_active_media_tab() {
             self.tab_view.set_selected_page(&tab.page);
@@ -1761,7 +1685,7 @@ impl BrowserApp {
     /// Alterna reproducción/pausa en la pestaña multimedia
     pub fn toggle_media_playback(&self) {
         if let Some(tab) = self.get_active_media_tab() {
-            let mp = self.sidebar.media_player.clone();
+            let header = self.header.clone();
             let js = r#"
                 (function() {
                     let largeBtn = document.querySelector('.ytp-large-play-button');
@@ -1790,13 +1714,18 @@ impl BrowserApp {
                             return true;
                         }
                     }
+                    let playBtn = document.querySelector('button[aria-label*="Play"], button[aria-label*="Reproducir"], button[data-testid="control-button-playpause"]');
+                    if (playBtn) {
+                        playBtn.click();
+                        return false;
+                    }
                     return false;
                 })()
             "#;
             tab.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, move |res| {
                 if let Ok(val) = res {
                     let is_paused = val.to_str() == "true";
-                    mp.set_playing_state(!is_paused);
+                    header.set_media_playing_state(!is_paused);
                 }
             });
         }
@@ -1831,87 +1760,17 @@ impl BrowserApp {
                 "#
             };
             tab.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
-            let mp = self.sidebar.media_player.clone();
-            let view = tab.webview.clone();
-            glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
-                Self::sync_media_metadata_from_view(&view, &mp);
-            });
         }
     }
 
     /// Alterna el silencio de audio de la pestaña multimedia
+    #[allow(dead_code)]
     pub fn toggle_media_mute(&self) {
         if let Some(tab) = self.get_active_media_tab() {
             let current = tab.webview.is_muted();
             let new_muted = !current;
             tab.webview.set_is_muted(new_muted);
-            self.sidebar.media_player.set_muted_state(new_muted);
+            tab.update_audio_state();
         }
-    }
-
-    /// Consulta y sincroniza metadatos multimedia (título, canal/artista, estado) desde la página web
-    pub fn sync_media_metadata_from_view(view: &webkit6::WebView, media_player: &Rc<crate::ui::SidebarMediaPlayer>) {
-        let is_muted = view.is_muted();
-        let mp = media_player.clone();
-        let fallback_title = view.title().map(|t| t.to_string()).unwrap_or_default();
-        let fallback_host = view.uri().map(|u| {
-            u.strip_prefix("https://")
-                .or_else(|| u.strip_prefix("http://"))
-                .and_then(|s| s.split('/').next())
-                .unwrap_or("Web Media")
-                .replace("www.", "")
-        }).unwrap_or_else(|| "Web Media".to_string());
-
-        let js = r#"
-            (function() {
-                let title = "";
-                let artist = "";
-                let paused = false;
-
-                if (navigator.mediaSession && navigator.mediaSession.metadata) {
-                    title = navigator.mediaSession.metadata.title || "";
-                    artist = navigator.mediaSession.metadata.artist || "";
-                }
-
-                let media = document.querySelector('video, audio');
-                if (media) {
-                    paused = media.paused;
-                }
-
-                if (!title) {
-                    title = document.title || "";
-                    title = title.replace(/\s*-\s*YouTube$/, '').replace(/\s*-\s*Spotify$/, '');
-                }
-
-                if (!artist) {
-                    artist = window.location.hostname.replace(/^www\./, '');
-                }
-
-                return JSON.stringify({
-                    title: title,
-                    artist: artist,
-                    paused: paused
-                });
-            })()
-        "#;
-
-        view.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, move |res| {
-            if let Ok(val) = res {
-                let json_str = val.to_str();
-                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str) {
-                    let mut title = parsed["title"].as_str().unwrap_or("").trim().to_string();
-                    let mut artist = parsed["artist"].as_str().unwrap_or("").trim().to_string();
-                    let paused = parsed["paused"].as_bool().unwrap_or(false);
-
-                    if title.is_empty() {
-                        title = fallback_title;
-                    }
-                    if artist.is_empty() {
-                        artist = fallback_host;
-                    }
-                    mp.set_info(&title, &artist, paused, is_muted);
-                }
-            }
-        });
     }
 }
