@@ -1,1 +1,22 @@
-/target
+# Rust build target
+/target/
+target/
+
+# Editor and IDE configurations
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.bak
+*.orig
+.DS_Store
+Thumbs.db
+
+# Logs and scratch
+*.log
+scratch/
+.system_generated/
+
+# Sensitive or local test configs
+*.local

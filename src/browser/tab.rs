@@ -797,8 +797,8 @@ impl BrowserTab {
                 .replace(
                     "/* __INITIAL_SETTINGS__ */",
                     &format!(
-                        "window.__NIKA_SETTINGS = {};\n    window.__NIKA_INITIAL_TAB = {:?};",
-                        current_json, initial_tab
+                        "window.__NIKA_SETTINGS = {};\n    window.__NIKA_INITIAL_TAB = {:?};\n    window.__NIKA_VERSION = {:?};\n    window.__NIKA_BUILD_DATE = {:?};",
+                        current_json, initial_tab, crate::version::VERSION, crate::version::BUILD_DATE
                     ),
                 )
                 .replace(

@@ -1,6 +1,6 @@
 [package]
 name = "nika-browser"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 edition = "2024"
 authors = ["demonc"]
 description = "Navegador web moderno, minimalista y seguro en Rust con WebKit, bloqueo de rastreadores y tema oscuro refinado."

@@ -8,6 +8,7 @@ mod search;
 mod settings;
 mod theme;
 mod ui;
+pub mod version;
 
 use app::BrowserApp;
 use libadwaita as adw;
@@ -16,6 +17,25 @@ use std::path::PathBuf;
 use theme::ThemeManager;
 
 fn main() -> glib::ExitCode {
+    // Manejo de flags de línea de comandos (--version, -v, --help)
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--version" || a == "-v" || a == "-V") {
+        println!("{}", version::version_info_string());
+        return glib::ExitCode::SUCCESS;
+    }
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        println!("🌸 {} v{}", version::APP_NAME, version::VERSION);
+        println!("Navegador web moderno, privado y rápido en Rust\n");
+        println!("Uso: nika-browser [OPCIONES] [URL...]\n");
+        println!("Opciones:");
+        println!("  -v, --version    Muestra la versión y fecha de compilación del binario");
+        println!("  -h, --help       Muestra esta ayuda de línea de comandos");
+        println!("\nRepositorio: https://github.com/MrDemonc/Nika-Browser");
+        return glib::ExitCode::SUCCESS;
+    }
+
+    println!("[Nika] 🚀 {} v{} (compilado: {})", version::APP_NAME, version::VERSION, version::BUILD_DATE);
+
     // Configurar ruta de códecs GStreamer locales si existen (~/.local/lib/gstreamer-1.0)
     let local_gst_path = glib::home_dir().join(".local/lib/gstreamer-1.0");
     if local_gst_path.exists() {
