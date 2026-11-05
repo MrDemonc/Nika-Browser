@@ -5,6 +5,7 @@ pub mod i18n;
 pub mod passwords;
 mod privacy;
 mod search;
+mod security;
 mod settings;
 mod theme;
 mod ui;
@@ -16,10 +17,35 @@ use libadwaita::prelude::*;
 use std::path::PathBuf;
 use theme::ThemeManager;
 
+fn find_resources_dir() -> PathBuf {
+    let mut candidates = Vec::new();
+    candidates.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")));
+    if let Ok(current) = std::env::current_dir() {
+        candidates.push(current);
+    }
+    candidates.push(glib::user_data_dir().join("nika-browser"));
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(parent) = exe.parent()
+    {
+        candidates.push(parent.to_path_buf());
+    }
+
+    for base in candidates {
+        if base.join("resources").is_dir() {
+            return base;
+        }
+    }
+
+    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+}
+
 fn main() -> glib::ExitCode {
     // Manejo de flags de línea de comandos (--version, -v, --help)
     let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|a| a == "--version" || a == "-v" || a == "-V") {
+    if args
+        .iter()
+        .any(|a| a == "--version" || a == "-v" || a == "-V")
+    {
         println!("{}", version::version_info_string());
         return glib::ExitCode::SUCCESS;
     }
@@ -34,7 +60,12 @@ fn main() -> glib::ExitCode {
         return glib::ExitCode::SUCCESS;
     }
 
-    println!("[Nika] 🚀 {} v{} (compilado: {})", version::APP_NAME, version::VERSION, version::BUILD_DATE);
+    println!(
+        "[Nika] 🚀 {} v{} (compilado: {})",
+        version::APP_NAME,
+        version::VERSION,
+        version::BUILD_DATE
+    );
 
     // Configurar ruta de códecs GStreamer locales si existen (~/.local/lib/gstreamer-1.0)
     let local_gst_path = glib::home_dir().join(".local/lib/gstreamer-1.0");
@@ -65,15 +96,7 @@ fn main() -> glib::ExitCode {
         .build();
 
     app.connect_startup(|_| {
-        // Encontrar directorio de recursos
-        let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-        let project_dir = if manifest_dir.join("resources").exists() {
-            manifest_dir
-        } else {
-            current_dir
-        };
+        let project_dir = find_resources_dir();
 
         let css_path = project_dir.join("resources/styles/pastel.css");
         let icons_path = project_dir.join("resources/icons");
@@ -97,13 +120,7 @@ fn main() -> glib::ExitCode {
     });
 
     app.connect_activate(|application| {
-        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let project_dir = if manifest_dir.join("resources").exists() {
-            manifest_dir
-        } else {
-            std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-        };
-
+        let project_dir = find_resources_dir();
         let browser = BrowserApp::new(application, project_dir);
         browser.present();
     });

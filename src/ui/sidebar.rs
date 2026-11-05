@@ -63,10 +63,14 @@ impl SidebarComponents {
         let pin_btn = gtk4::Button::from_icon_name("nika-pin-symbolic");
         pin_btn.add_css_class("sidebar-action-btn");
         if initial_auto_hide {
-            pin_btn.set_tooltip_text(Some("Auto-ocultar activo (Pasa el cursor por el borde para ver)"));
+            pin_btn.set_tooltip_text(Some(
+                "Auto-ocultar activo (Pasa el cursor por el borde para ver)",
+            ));
         } else {
             pin_btn.add_css_class("pinned");
-            pin_btn.set_tooltip_text(Some("Panel fijado permanentemente (Clic para auto-ocultar)"));
+            pin_btn.set_tooltip_text(Some(
+                "Panel fijado permanentemente (Clic para auto-ocultar)",
+            ));
         }
 
         let new_tab_btn = gtk4::Button::from_icon_name("nika-plus-symbolic");
@@ -222,14 +226,18 @@ impl SidebarComponents {
                 let _ = s_clone_pin.borrow().save();
                 if is_auto {
                     pin_btn.remove_css_class("pinned");
-                    pin_btn.set_tooltip_text(Some("Auto-ocultar activo (Pasa el cursor por el borde para ver)"));
+                    pin_btn.set_tooltip_text(Some(
+                        "Auto-ocultar activo (Pasa el cursor por el borde para ver)",
+                    ));
                     edge_trigger_clone.set_visible(true);
                     revealer.set_reveal_child(false);
                     s_card_clone.remove_css_class("docked-sidebar");
                     s_card_clone.add_css_class("floating-sidebar");
                 } else {
                     pin_btn.add_css_class("pinned");
-                    pin_btn.set_tooltip_text(Some("Panel fijado permanentemente (Clic para auto-ocultar)"));
+                    pin_btn.set_tooltip_text(Some(
+                        "Panel fijado permanentemente (Clic para auto-ocultar)",
+                    ));
                     edge_trigger_clone.set_visible(false);
                     revealer.set_reveal_child(true);
                     s_card_clone.remove_css_class("floating-sidebar");
@@ -297,14 +305,18 @@ impl SidebarComponents {
         *self.auto_hide_enabled.borrow_mut() = is_auto;
         if is_auto {
             self.pin_btn.remove_css_class("pinned");
-            self.pin_btn.set_tooltip_text(Some("Auto-ocultar activo (Pasa el cursor por el borde para ver)"));
+            self.pin_btn.set_tooltip_text(Some(
+                "Auto-ocultar activo (Pasa el cursor por el borde para ver)",
+            ));
             self.edge_trigger.set_visible(true);
             self.revealer.set_reveal_child(false);
             self.sidebar_card.remove_css_class("docked-sidebar");
             self.sidebar_card.add_css_class("floating-sidebar");
         } else {
             self.pin_btn.add_css_class("pinned");
-            self.pin_btn.set_tooltip_text(Some("Panel fijado permanentemente (Clic para auto-ocultar)"));
+            self.pin_btn.set_tooltip_text(Some(
+                "Panel fijado permanentemente (Clic para auto-ocultar)",
+            ));
             self.edge_trigger.set_visible(false);
             self.revealer.set_reveal_child(true);
             self.sidebar_card.remove_css_class("floating-sidebar");
@@ -319,10 +331,13 @@ impl SidebarComponents {
     pub fn update_language(&self, lang: &str) {
         use crate::i18n::tr;
         self.new_tab_btn.set_tooltip_text(Some(tr(lang, "new_tab")));
-        self.new_incognito_tab_btn.set_tooltip_text(Some(tr(lang, "new_incognito_tab")));
-        self.translate_btn.set_tooltip_text(Some(tr(lang, "nav_translate")));
+        self.new_incognito_tab_btn
+            .set_tooltip_text(Some(tr(lang, "new_incognito_tab")));
+        self.translate_btn
+            .set_tooltip_text(Some(tr(lang, "nav_translate")));
         if *self.auto_hide_enabled.borrow() {
-            self.pin_btn.set_tooltip_text(Some(tr(lang, "sidebar_auto_hide")));
+            self.pin_btn
+                .set_tooltip_text(Some(tr(lang, "sidebar_auto_hide")));
         } else {
             self.pin_btn.set_tooltip_text(Some(tr(lang, "sidebar_pin")));
         }
@@ -414,11 +429,13 @@ impl SidebarComponents {
                         parent_box.append(&drop_indicator);
                     }
                     if target > initial {
-                        parent_box.reorder_child_after(&drop_indicator, Some(&sibling_pills[target]));
+                        parent_box
+                            .reorder_child_after(&drop_indicator, Some(&sibling_pills[target]));
                     } else if target == 0 {
                         parent_box.reorder_child_after(&drop_indicator, None::<&gtk4::Widget>);
                     } else {
-                        parent_box.reorder_child_after(&drop_indicator, Some(&sibling_pills[target - 1]));
+                        parent_box
+                            .reorder_child_after(&drop_indicator, Some(&sibling_pills[target - 1]));
                     }
                 } else {
                     *target_slot_idx.borrow_mut() = None;
@@ -528,7 +545,14 @@ impl SidebarComponents {
                     #[weak]
                     popover,
                     move |_| {
-                        move_tab_internal(&tabs, &normal_box_rc, &incog_box_rc, &tab_view, &page, -1);
+                        move_tab_internal(
+                            &tabs,
+                            &normal_box_rc,
+                            &incog_box_rc,
+                            &tab_view,
+                            &page,
+                            -1,
+                        );
                         popover.popdown();
                     }
                 ));
@@ -549,7 +573,14 @@ impl SidebarComponents {
                     #[weak]
                     popover,
                     move |_| {
-                        move_tab_internal(&tabs, &normal_box_rc, &incog_box_rc, &tab_view, &page, 1);
+                        move_tab_internal(
+                            &tabs,
+                            &normal_box_rc,
+                            &incog_box_rc,
+                            &tab_view,
+                            &page,
+                            1,
+                        );
                         popover.popdown();
                     }
                 ));
@@ -595,11 +626,14 @@ impl SidebarComponents {
                             let a = auto_hide_en.clone();
                             let ptr = is_ptr_inside.clone();
                             let pop = is_pop_open.clone();
-                            glib::timeout_add_local_once(std::time::Duration::from_millis(350), move || {
-                                if *a.borrow() && !*ptr.borrow() && !*pop.borrow() {
-                                    r.set_reveal_child(false);
-                                }
-                            });
+                            glib::timeout_add_local_once(
+                                std::time::Duration::from_millis(350),
+                                move || {
+                                    if *a.borrow() && !*ptr.borrow() && !*pop.borrow() {
+                                        r.set_reveal_child(false);
+                                    }
+                                },
+                            );
                         }
                     }
                 ));
@@ -621,13 +655,21 @@ pub fn move_tab_internal(
 ) {
     let (from_idx, to_idx, is_incog) = {
         let tabs_borrow = tabs.borrow();
-        let pos = tabs_borrow.iter().position(|t| t.page == *page);
-        if let Some(current) = pos {
-            let target = (current as i32 + delta).clamp(0, (tabs_borrow.len() - 1) as i32) as usize;
-            (current, target, tabs_borrow[current].is_incognito)
-        } else {
+        let Some(current) = tabs_borrow.iter().position(|t| t.page == *page) else {
             return;
-        }
+        };
+        let is_incognito = tabs_borrow[current].is_incognito;
+        let group: Vec<usize> = tabs_borrow
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.is_incognito == is_incognito)
+            .map(|(idx, _)| idx)
+            .collect();
+        let Some(group_pos) = group.iter().position(|&idx| idx == current) else {
+            return;
+        };
+        let target_pos = (group_pos as i32 + delta).clamp(0, (group.len() - 1) as i32) as usize;
+        (current, group[target_pos], is_incognito)
     };
 
     if from_idx != to_idx {
@@ -652,7 +694,10 @@ pub fn move_tab_internal(
             .iter()
             .filter(|t| t.is_incognito == is_incog)
             .collect();
-        let sibling_idx = siblings.iter().position(|t| t.page == target_tab.page).unwrap_or(0);
+        let sibling_idx = siblings
+            .iter()
+            .position(|t| t.page == target_tab.page)
+            .unwrap_or(0);
         if sibling_idx == 0 {
             parent_box.reorder_child_after(&target_tab.tab_pill, None::<&gtk4::Widget>);
         } else {

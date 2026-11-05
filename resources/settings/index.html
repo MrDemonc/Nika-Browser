@@ -1068,8 +1068,8 @@
 
     function toggleVaultAction() {
       if (vaultStatus.is_unlocked) {
-        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nikaLockVault) {
-          window.webkit.messageHandlers.nikaLockVault.postMessage("");
+        if (window.nikaSend) {
+          window.nikaSend("nikaLockVault", "");
         }
       } else {
         document.getElementById("vault-unlock-box").style.display = "block";
@@ -1082,12 +1082,12 @@
       if (!pass) return;
 
       if (!vaultStatus.is_configured) {
-        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nikaSetupVault) {
-          window.webkit.messageHandlers.nikaSetupVault.postMessage(pass);
+        if (window.nikaSend) {
+          window.nikaSend("nikaSetupVault", pass);
         }
       } else {
-        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nikaUnlockVault) {
-          window.webkit.messageHandlers.nikaUnlockVault.postMessage(pass);
+        if (window.nikaSend) {
+          window.nikaSend("nikaUnlockVault", pass);
         }
       }
     }
@@ -1125,49 +1125,96 @@
 
     function renderPasswordsList(list) {
       const container = document.getElementById("passwords-list-container");
-      container.innerHTML = "";
+      container.replaceChildren();
       const isEn = currentConfig.language === "en";
 
       if (!list || list.length === 0) {
-        container.innerHTML = `
-          <div style="padding: 32px 16px; text-align: center; color: var(--text-muted);">
-            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 8px; opacity: 0.5;">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-            </svg>
-            <p style="font-size: 13px; font-weight: 500; color: #d0d0d0; margin-bottom: 4px;">${isEn ? "No passwords saved in vault yet" : "No hay contraseñas guardadas en la bóveda aún"}</p>
-            <p style="font-size: 12px; margin-bottom: 14px;">${isEn ? "Your credentials stay strictly encrypted on disk with AES-256-GCM." : "Tus credenciales se cifran con AES-256-GCM y nunca salen de este equipo."}</p>
-            <button class="btn btn-secondary" onclick="toggleAddPasswordBox(true)">+ ${isEn ? "Add First Account" : "Añadir Primera Cuenta"}</button>
-          </div>
+        const empty = document.createElement("div");
+        empty.style.cssText = "padding: 32px 16px; text-align: center; color: var(--text-muted);";
+        empty.innerHTML = `
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 8px; opacity: 0.5;">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <p style="font-size: 13px; font-weight: 500; color: #d0d0d0; margin-bottom: 4px;">${isEn ? "No passwords saved in vault yet" : "No hay contraseñas guardadas en la bóveda aún"}</p>
+          <p style="font-size: 12px; margin-bottom: 14px;">${isEn ? "Your credentials stay strictly encrypted on disk with AES-256-GCM." : "Tus credenciales se cifran con AES-256-GCM y nunca salen de este equipo."}</p>
+          <button class="btn btn-secondary" onclick="toggleAddPasswordBox(true)">+ ${isEn ? "Add First Account" : "Añadir Primera Cuenta"}</button>
         `;
+        container.appendChild(empty);
         return;
       }
+
+      const globeSvg = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line></svg>';
+      const eyeSvg = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+      const copySvg = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+      const xSvg = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
 
       list.forEach(item => {
         const row = document.createElement("div");
         row.className = "vault-item";
-        row.innerHTML = `
-          <div class="vault-item-left">
-            <div class="vault-item-icon">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line></svg>
-            </div>
-            <div class="vault-item-details">
-              <h4>${escapeHtml(item.domain)}</h4>
-              <p>${escapeHtml(item.username)} • <span class="pass-mask" id="mask-${item.id}">••••••••</span><span class="pass-clear" id="clear-${item.id}" style="display: none; font-family: monospace;">${escapeHtml(item.password)}</span></p>
-            </div>
-          </div>
-          <div class="vault-item-actions">
-            <button class="icon-btn" title="Mostrar/Ocultar" onclick="togglePassVisibility('${item.id}')">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-            </button>
-            <button class="icon-btn" title="Copiar contraseña" onclick="copyPassword('${escapeHtml(item.password)}')">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            </button>
-            <button class="icon-btn" style="color: var(--danger);" title="Eliminar" onclick="deletePassword('${item.id}')">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-          </div>
-        `;
+
+        const left = document.createElement("div");
+        left.className = "vault-item-left";
+
+        const iconBox = document.createElement("div");
+        iconBox.className = "vault-item-icon";
+        iconBox.innerHTML = globeSvg;
+
+        const details = document.createElement("div");
+        details.className = "vault-item-details";
+
+        const domain = document.createElement("h4");
+        domain.textContent = item.domain || "";
+
+        const line = document.createElement("p");
+        line.appendChild(document.createTextNode(`${item.username || ""} • `));
+
+        const mask = document.createElement("span");
+        mask.className = "pass-mask";
+        mask.id = `mask-${item.id}`;
+        mask.textContent = "••••••••";
+
+        const clear = document.createElement("span");
+        clear.className = "pass-clear";
+        clear.id = `clear-${item.id}`;
+        clear.style.display = "none";
+        clear.style.fontFamily = "monospace";
+        clear.textContent = item.password || "";
+
+        line.appendChild(mask);
+        line.appendChild(clear);
+        details.appendChild(domain);
+        details.appendChild(line);
+        left.appendChild(iconBox);
+        left.appendChild(details);
+
+        const actions = document.createElement("div");
+        actions.className = "vault-item-actions";
+
+        const showBtn = document.createElement("button");
+        showBtn.className = "icon-btn";
+        showBtn.title = isEn ? "Show/Hide" : "Mostrar/Ocultar";
+        showBtn.innerHTML = eyeSvg;
+        showBtn.addEventListener("click", () => togglePassVisibility(item.id));
+
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "icon-btn";
+        copyBtn.title = isEn ? "Copy password" : "Copiar contraseña";
+        copyBtn.innerHTML = copySvg;
+        copyBtn.addEventListener("click", () => copyPasswordById(item.id));
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "icon-btn";
+        deleteBtn.style.color = "var(--danger)";
+        deleteBtn.title = isEn ? "Delete" : "Eliminar";
+        deleteBtn.innerHTML = xSvg;
+        deleteBtn.addEventListener("click", () => deletePassword(item.id));
+
+        actions.appendChild(showBtn);
+        actions.appendChild(copyBtn);
+        actions.appendChild(deleteBtn);
+        row.appendChild(left);
+        row.appendChild(actions);
         container.appendChild(row);
       });
     }
@@ -1182,14 +1229,17 @@
       }
     }
 
-    function copyPassword(pass) {
-      navigator.clipboard.writeText(pass);
-      showToast(currentConfig.language === "en" ? "Password copied to clipboard" : "Contraseña copiada al portapapeles");
+    function copyPasswordById(id) {
+      const item = storedPasswords.find(entry => String(entry.id) === String(id));
+      if (!item) return;
+      navigator.clipboard.writeText(item.password).then(() => {
+        showToast(currentConfig.language === "en" ? "Password copied to clipboard" : "Contraseña copiada al portapapeles");
+      });
     }
 
     function deletePassword(id) {
-      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nikaDeletePassword) {
-        window.webkit.messageHandlers.nikaDeletePassword.postMessage(id);
+      if (window.nikaSend) {
+        window.nikaSend("nikaDeletePassword", id);
       }
     }
 
@@ -1215,8 +1265,8 @@
         return;
       }
 
-      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nikaSavePassword) {
-        window.webkit.messageHandlers.nikaSavePassword.postMessage(JSON.stringify({ domain, username, password }));
+      if (window.nikaSend) {
+        window.nikaSend("nikaSavePassword", JSON.stringify({ domain, username, password }));
         toggleAddPasswordBox(false);
         showToast(currentConfig.language === "en" ? "Password saved to vault" : "Contraseña guardada en la bóveda");
       }
@@ -1243,6 +1293,8 @@
       const payload = {
         language: document.getElementById("lang-select").value,
         time_format: document.getElementById("time-format-select").value,
+        auto_translate: !!currentConfig.auto_translate,
+        translate_target_lang: currentConfig.translate_target_lang || "es",
         dns_provider: providerNames[pIdx] || "Cloudflare",
         custom_dns: document.getElementById("custom-dns-input").value.trim(),
         doh_enabled: document.getElementById("doh-toggle").checked,
@@ -1259,8 +1311,8 @@
       currentConfig = payload;
       renderUI();
 
-      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nikaSaveSettings) {
-        window.webkit.messageHandlers.nikaSaveSettings.postMessage(JSON.stringify(payload));
+      if (window.nikaSend) {
+        window.nikaSend("nikaSaveSettings", JSON.stringify(payload));
       }
 
       showToast();
@@ -1271,8 +1323,8 @@
     }
 
     document.getElementById("pick-download-btn").addEventListener("click", () => {
-      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nikaPickFolder) {
-        window.webkit.messageHandlers.nikaPickFolder.postMessage("");
+      if (window.nikaSend) {
+        window.nikaSend("nikaPickFolder", "");
       }
     });
 
@@ -1341,8 +1393,8 @@
     window.addEventListener("DOMContentLoaded", () => {
       renderUI();
       checkHashTab();
-      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nikaGetVaultStatus) {
-        window.webkit.messageHandlers.nikaGetVaultStatus.postMessage("");
+      if (window.nikaSend) {
+        window.nikaSend("nikaGetVaultStatus", "");
       }
     });
   </script>

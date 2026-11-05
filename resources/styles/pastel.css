@@ -1408,6 +1408,8 @@ popover.translation-popover > arrow {
   border-radius: 6px;
 }
 
+
+.translation-dropdown { min-width: 130px; width: 130px; }
 /* ====================================================================
    Ranura y animación de arrastre de pestañas (Drag & Drop Gap Slot)
    ==================================================================== */

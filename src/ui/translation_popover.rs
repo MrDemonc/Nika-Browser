@@ -35,23 +35,30 @@ pub struct TranslationPopover {
     pub settings: Rc<RefCell<BrowserSettings>>,
     on_translate: Rc<RefCell<Option<Box<dyn Fn(String)>>>>,
     on_restore: Rc<RefCell<Option<Box<dyn Fn()>>>>,
+    parent_btn: glib::WeakRef<gtk4::Button>,
+    align_to: glib::WeakRef<gtk4::Widget>,
 }
 
 impl TranslationPopover {
-    pub fn new(parent_btn: &gtk4::Button, settings: Rc<RefCell<BrowserSettings>>) -> Self {
+    pub fn new(
+        parent_btn: &gtk4::Button,
+        align_to: &gtk4::Widget,
+        settings: Rc<RefCell<BrowserSettings>>,
+    ) -> Self {
         let popover = gtk4::Popover::new();
         popover.set_parent(parent_btn);
         popover.add_css_class("translation-popover");
         popover.set_has_arrow(false);
         popover.set_position(gtk4::PositionType::Right);
-        popover.set_offset(10, 0);
+        popover.set_valign(gtk4::Align::Start);
+        popover.set_offset(16, 0);
 
-        let content_box = gtk4::Box::new(gtk4::Orientation::Vertical, 8);
+        let content_box = gtk4::Box::new(gtk4::Orientation::Vertical, 5);
         content_box.add_css_class("translation-content-box");
-        content_box.set_size_request(240, -1);
+        content_box.set_size_request(200, -1);
 
         // Cabecera del popover
-        let header_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
+        let header_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
         header_row.add_css_class("translation-header-row");
 
         let icon = gtk4::Image::from_icon_name("nika-translate-symbolic");
@@ -81,15 +88,16 @@ impl TranslationPopover {
         let sep = gtk4::Separator::new(gtk4::Orientation::Horizontal);
 
         // Opción 1: Switch sugerir automáticamente
-        let auto_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
+        let auto_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
         auto_row.set_valign(gtk4::Align::Center);
 
-        let auto_label = gtk4::Label::new(Some(crate::i18n::tr(&lang_code, "translate_auto_suggest")));
+        let auto_label =
+            gtk4::Label::new(Some(crate::i18n::tr(&lang_code, "translate_auto_suggest")));
         auto_label.add_css_class("translation-label");
         auto_label.set_hexpand(true);
         auto_label.set_halign(gtk4::Align::Start);
         auto_label.set_wrap(true);
-        auto_label.set_max_width_chars(20);
+        auto_label.set_max_width_chars(16);
 
         let auto_translate_switch = gtk4::Switch::new();
         auto_translate_switch.set_active(settings.borrow().auto_translate);
@@ -105,25 +113,31 @@ impl TranslationPopover {
         auto_row.append(&auto_translate_switch);
 
         // Opción 2: Selector de idioma objetivo
-        let lang_row = gtk4::Box::new(gtk4::Orientation::Vertical, 4);
+        let lang_row = gtk4::Box::new(gtk4::Orientation::Vertical, 2);
 
-        let lang_label = gtk4::Label::new(Some(crate::i18n::tr(&lang_code, "translate_target_lang")));
+        let lang_label =
+            gtk4::Label::new(Some(crate::i18n::tr(&lang_code, "translate_target_lang")));
         lang_label.add_css_class("translation-label");
         lang_label.set_halign(gtk4::Align::Start);
+lang_label.set_visible(false);
 
         let lang_names: Vec<&str> = SUPPORTED_LANGUAGES.iter().map(|(_, name)| *name).collect();
         let lang_dropdown = gtk4::DropDown::from_strings(&lang_names);
         lang_dropdown.add_css_class("translation-dropdown");
 
         let current_target = settings.borrow().translate_target_lang.clone();
-        if let Some(pos) = SUPPORTED_LANGUAGES.iter().position(|(code, _)| *code == current_target) {
+        if let Some(pos) = SUPPORTED_LANGUAGES
+            .iter()
+            .position(|(code, _)| *code == current_target)
+        {
             lang_dropdown.set_selected(pos as u32);
         } else {
             lang_dropdown.set_selected(0);
         }
 
         let s_drop = settings.clone();
-        let on_translate_ref: Rc<RefCell<Option<Box<dyn Fn(String)>>>> = Rc::new(RefCell::new(None));
+        let on_translate_ref: Rc<RefCell<Option<Box<dyn Fn(String)>>>> =
+            Rc::new(RefCell::new(None));
         let on_trans_clone = on_translate_ref.clone();
         lang_dropdown.connect_selected_notify(move |dd| {
             let idx = dd.selected() as usize;
@@ -141,14 +155,16 @@ impl TranslationPopover {
         lang_row.append(&lang_dropdown);
 
         // Botones de acción rápida
-        let actions_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
+        let actions_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
         actions_row.set_halign(gtk4::Align::End);
 
-        let translate_now_btn = gtk4::Button::with_label(crate::i18n::tr(&lang_code, "translate_now"));
+        let translate_now_btn =
+            gtk4::Button::with_label(crate::i18n::tr(&lang_code, "translate_now"));
         translate_now_btn.add_css_class("suggested-action");
         translate_now_btn.add_css_class("translation-action-btn");
 
-        let restore_btn = gtk4::Button::with_label(crate::i18n::tr(&lang_code, "translate_restore"));
+        let restore_btn =
+            gtk4::Button::with_label(crate::i18n::tr(&lang_code, "translate_restore"));
         restore_btn.add_css_class("translation-action-btn");
 
         actions_row.append(&restore_btn);
@@ -196,6 +212,8 @@ impl TranslationPopover {
             settings,
             on_translate: on_translate_ref,
             on_restore: on_restore_ref,
+            parent_btn: parent_btn.downgrade(),
+            align_to: align_to.downgrade(),
         }
     }
 
@@ -208,6 +226,12 @@ impl TranslationPopover {
     }
 
     pub fn popup(&self) {
+        if let (Some(parent_btn), Some(align_to)) =
+            (self.parent_btn.upgrade(), self.align_to.upgrade())
+            && let Some(bounds) = parent_btn.compute_bounds(&align_to)
+        {
+            self.popover.set_offset(16, -(bounds.y() as i32));
+        }
         self.popover.popup();
     }
 

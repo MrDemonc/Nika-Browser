@@ -1,19 +1,30 @@
 use aes_gcm::{
-    aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit},
 };
 use pbkdf2::pbkdf2_hmac;
 use rand::Rng;
 use sha2::Sha256;
 
-const PBKDF2_ITERATIONS: u32 = 100_000;
+pub const DEFAULT_PBKDF2_ITERATIONS: u32 = 600_000;
+pub const LEGACY_PBKDF2_ITERATIONS: u32 = 100_000;
 const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
 
-/// Deriva una clave de 256 bits a partir de la contraseña maestra y una sal criptográfica
+/// Deriva una clave de 256 bits con el número de iteraciones actual.
 pub fn derive_master_key(master_password: &str, salt: &[u8]) -> [u8; 32] {
+    derive_master_key_with_iterations(master_password, salt, DEFAULT_PBKDF2_ITERATIONS)
+}
+
+/// Deriva una clave de 256 bits usando un número de iteraciones concreto.
+/// Permite seguir abriendo bóvedas creadas con parámetros anteriores.
+pub fn derive_master_key_with_iterations(
+    master_password: &str,
+    salt: &[u8],
+    iterations: u32,
+) -> [u8; 32] {
     let mut key = [0u8; 32];
-    pbkdf2_hmac::<Sha256>(master_password.as_bytes(), salt, PBKDF2_ITERATIONS, &mut key);
+    pbkdf2_hmac::<Sha256>(master_password.as_bytes(), salt, iterations, &mut key);
     key
 }
 
@@ -32,8 +43,12 @@ pub fn generate_nonce() -> [u8; NONCE_LEN] {
 }
 
 /// Cifra datos con AES-256-GCM usando la clave derivada
-pub fn encrypt_bytes(key: &[u8; 32], plaintext: &[u8]) -> Result<(Vec<u8>, [u8; NONCE_LEN]), String> {
-    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| format!("Error inicializando cifrador: {}", e))?;
+pub fn encrypt_bytes(
+    key: &[u8; 32],
+    plaintext: &[u8],
+) -> Result<(Vec<u8>, [u8; NONCE_LEN]), String> {
+    let cipher = Aes256Gcm::new_from_slice(key)
+        .map_err(|e| format!("Error inicializando cifrador: {}", e))?;
     let nonce_bytes = generate_nonce();
     let nonce = Nonce::from(nonce_bytes);
     let ciphertext = cipher
@@ -43,8 +58,13 @@ pub fn encrypt_bytes(key: &[u8; 32], plaintext: &[u8]) -> Result<(Vec<u8>, [u8; 
 }
 
 /// Descifra datos con AES-256-GCM comprobando la autenticidad
-pub fn decrypt_bytes(key: &[u8; 32], ciphertext: &[u8], nonce_bytes: &[u8; NONCE_LEN]) -> Result<Vec<u8>, String> {
-    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| format!("Error inicializando cifrador: {}", e))?;
+pub fn decrypt_bytes(
+    key: &[u8; 32],
+    ciphertext: &[u8],
+    nonce_bytes: &[u8; NONCE_LEN],
+) -> Result<Vec<u8>, String> {
+    let cipher = Aes256Gcm::new_from_slice(key)
+        .map_err(|e| format!("Error inicializando cifrador: {}", e))?;
     let nonce = Nonce::from(*nonce_bytes);
     let decrypted = cipher
         .decrypt(&nonce, ciphertext)

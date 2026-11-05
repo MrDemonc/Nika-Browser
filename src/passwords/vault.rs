@@ -1,5 +1,6 @@
 use super::crypto::{
-    decrypt_bytes, derive_master_key, encrypt_bytes, from_base64, generate_salt, to_base64,
+    DEFAULT_PBKDF2_ITERATIONS, LEGACY_PBKDF2_ITERATIONS, decrypt_bytes, derive_master_key,
+    derive_master_key_with_iterations, encrypt_bytes, from_base64, generate_salt, to_base64,
 };
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -8,6 +9,18 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 const VERIFIER_PLAINTEXT: &[u8] = b"NIKA_PASSWORD_VAULT_OK";
+
+fn default_iterations() -> u32 {
+    LEGACY_PBKDF2_ITERATIONS
+}
+
+fn effective_iterations(stored: u32) -> u32 {
+    if stored == 0 {
+        LEGACY_PBKDF2_ITERATIONS
+    } else {
+        stored
+    }
+}
 
 /// Credencial individual cifrada almacenada en disco
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,6 +51,8 @@ pub struct VaultData {
     pub salt: String,           // Base64 (16 bytes)
     pub verifier: String,       // Base64 del VERIFIER_PLAINTEXT cifrado
     pub verifier_nonce: String, // Base64 (12 bytes)
+    #[serde(default = "default_iterations")]
+    pub iterations: u32,
     #[serde(default)]
     pub entries: Vec<EncryptedCredential>,
 }
@@ -95,6 +110,7 @@ impl PasswordVault {
             salt: to_base64(&salt),
             verifier: to_base64(&verifier_cipher),
             verifier_nonce: to_base64(&verifier_nonce),
+            iterations: DEFAULT_PBKDF2_ITERATIONS,
             entries: Vec::new(),
         };
 
@@ -119,7 +135,8 @@ impl PasswordVault {
             .map_err(|e| format!("Error parseando archivo de bóveda: {}", e))?;
 
         let salt_bytes = from_base64(&vault_data.salt)?;
-        let key = derive_master_key(master_password, &salt_bytes);
+        let iterations = effective_iterations(vault_data.iterations);
+        let key = derive_master_key_with_iterations(master_password, &salt_bytes, iterations);
 
         let verifier_cipher = from_base64(&vault_data.verifier)?;
         let nonce_bytes = from_base64(&vault_data.verifier_nonce)?;
@@ -158,7 +175,8 @@ impl PasswordVault {
         // 2. Generar nueva sal y clave
         let new_salt = generate_salt();
         let new_key = derive_master_key(new_master, &new_salt);
-        let (new_verifier_cipher, new_verifier_nonce) = encrypt_bytes(&new_key, VERIFIER_PLAINTEXT)?;
+        let (new_verifier_cipher, new_verifier_nonce) =
+            encrypt_bytes(&new_key, VERIFIER_PLAINTEXT)?;
 
         // 3. Re-cifrar cada entrada con la nueva clave
         let mut new_entries = Vec::new();
@@ -179,6 +197,7 @@ impl PasswordVault {
             salt: to_base64(&new_salt),
             verifier: to_base64(&new_verifier_cipher),
             verifier_nonce: to_base64(&new_verifier_nonce),
+            iterations: DEFAULT_PBKDF2_ITERATIONS,
             entries: new_entries,
         };
 
@@ -193,10 +212,14 @@ impl PasswordVault {
 
     /// Retorna la lista de todas las credenciales descifradas
     pub fn list_entries(&self) -> Result<Vec<DecryptedCredential>, String> {
-        let key = match *self.unlocked_key.borrow() {
-            Some(k) => k,
-            None => return Err("Bóveda bloqueada. Ingresa la contraseña maestra para ver las credenciales.".to_string()),
-        };
+        let key =
+            match *self.unlocked_key.borrow() {
+                Some(k) => k,
+                None => return Err(
+                    "Bóveda bloqueada. Ingresa la contraseña maestra para ver las credenciales."
+                        .to_string(),
+                ),
+            };
 
         if !self.file_path.exists() {
             return Ok(Vec::new());
@@ -204,8 +227,8 @@ impl PasswordVault {
 
         let content = fs::read_to_string(&self.file_path)
             .map_err(|e| format!("Error leyendo bóveda: {}", e))?;
-        let vault_data: VaultData = serde_json::from_str(&content)
-            .map_err(|e| format!("Error parseando bóveda: {}", e))?;
+        let vault_data: VaultData =
+            serde_json::from_str(&content).map_err(|e| format!("Error parseando bóveda: {}", e))?;
 
         let mut result = Vec::new();
         for enc in vault_data.entries {
@@ -240,10 +263,17 @@ impl PasswordVault {
     }
 
     /// Añade o actualiza una credencial
-    pub fn add_or_update_entry(&self, domain: &str, username: &str, password: &str) -> Result<DecryptedCredential, String> {
+    pub fn add_or_update_entry(
+        &self,
+        domain: &str,
+        username: &str,
+        password: &str,
+    ) -> Result<DecryptedCredential, String> {
         let key = match *self.unlocked_key.borrow() {
             Some(k) => k,
-            None => return Err("Bóveda bloqueada. Desbloquea para guardar contraseñas.".to_string()),
+            None => {
+                return Err("Bóveda bloqueada. Desbloquea para guardar contraseñas.".to_string());
+            }
         };
 
         let clean_domain = domain.trim().to_lowercase();
@@ -259,15 +289,20 @@ impl PasswordVault {
         };
 
         let now = glib::DateTime::now_local()
-            .map(|dt| dt.format("%Y-%m-%d %H:%M").map(|s| s.to_string()).unwrap_or_default())
+            .map(|dt| {
+                dt.format("%Y-%m-%d %H:%M")
+                    .map(|s| s.to_string())
+                    .unwrap_or_default()
+            })
             .unwrap_or_else(|_| "2026-10-31".to_string());
 
         let (ciphertext, nonce) = encrypt_bytes(&key, password.as_bytes())?;
 
         // Comprobar si ya existe una entrada para este dominio y usuario
-        let existing_idx = vault_data.entries.iter().position(|e| {
-            e.domain.to_lowercase() == clean_domain && e.username == clean_user
-        });
+        let existing_idx = vault_data
+            .entries
+            .iter()
+            .position(|e| e.domain.to_lowercase() == clean_domain && e.username == clean_user);
 
         let id = if let Some(idx) = existing_idx {
             let existing_id = vault_data.entries[idx].id.clone();
@@ -291,8 +326,7 @@ impl PasswordVault {
 
         let json = serde_json::to_string_pretty(&vault_data)
             .map_err(|e| format!("Error serializando: {}", e))?;
-        fs::write(&self.file_path, json)
-            .map_err(|e| format!("Error guardando: {}", e))?;
+        fs::write(&self.file_path, json).map_err(|e| format!("Error guardando: {}", e))?;
 
         Ok(DecryptedCredential {
             id,
@@ -316,15 +350,14 @@ impl PasswordVault {
 
         let content = fs::read_to_string(&self.file_path)
             .map_err(|e| format!("Error leyendo bóveda: {}", e))?;
-        let mut vault_data: VaultData = serde_json::from_str(&content)
-            .map_err(|e| format!("Error parseando bóveda: {}", e))?;
+        let mut vault_data: VaultData =
+            serde_json::from_str(&content).map_err(|e| format!("Error parseando bóveda: {}", e))?;
 
         vault_data.entries.retain(|e| e.id != id);
 
         let json = serde_json::to_string_pretty(&vault_data)
             .map_err(|e| format!("Error serializando: {}", e))?;
-        fs::write(&self.file_path, json)
-            .map_err(|e| format!("Error guardando: {}", e))?;
+        fs::write(&self.file_path, json).map_err(|e| format!("Error guardando: {}", e))?;
 
         Ok(())
     }
@@ -370,12 +403,16 @@ mod tests {
         assert!(!vault.is_unlocked());
 
         // Configurar contraseña maestra
-        vault.setup_master_password("MasterPassword123!").expect("Setup failed");
+        vault
+            .setup_master_password("MasterPassword123!")
+            .expect("Setup failed");
         assert!(vault.is_configured());
         assert!(vault.is_unlocked());
 
         // Añadir credencial
-        let entry1 = vault.add_or_update_entry("github.com", "developer", "ghp_secureToken99").expect("Add failed");
+        let entry1 = vault
+            .add_or_update_entry("github.com", "developer", "ghp_secureToken99")
+            .expect("Add failed");
         assert_eq!(entry1.domain, "github.com");
         assert_eq!(entry1.username, "developer");
         assert_eq!(entry1.password, "ghp_secureToken99");
@@ -392,7 +429,9 @@ mod tests {
         assert!(!vault.is_unlocked());
 
         // Desbloquear con contraseña correcta
-        let correct_unlock = vault.unlock("MasterPassword123!").expect("Unlock call failed");
+        let correct_unlock = vault
+            .unlock("MasterPassword123!")
+            .expect("Unlock call failed");
         assert!(correct_unlock);
         assert!(vault.is_unlocked());
 
@@ -404,7 +443,9 @@ mod tests {
         assert_eq!(list[0].password, "ghp_secureToken99");
 
         // Cambiar contraseña maestra
-        vault.change_master_password("MasterPassword123!", "NewMasterPass456!").expect("Change master pass failed");
+        vault
+            .change_master_password("MasterPassword123!", "NewMasterPass456!")
+            .expect("Change master pass failed");
 
         // Bloquear y re-verificar con nueva contraseña
         vault.lock();

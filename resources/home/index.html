@@ -307,8 +307,8 @@
         currentSettings.time_format = timeFormat;
         updateClock();
 
-        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nikaSaveSettings) {
-          window.webkit.messageHandlers.nikaSaveSettings.postMessage(JSON.stringify(currentSettings));
+        if (window.nikaSend) {
+          window.nikaSend("nikaSaveSettings", JSON.stringify(currentSettings));
         }
       });
     }

@@ -1,5 +1,5 @@
 use crate::browser::permissions::SitePermissionsManager;
-use crate::browser::{save_session_data, BrowserTab, SessionState};
+use crate::browser::{BrowserTab, SessionState, save_session_data};
 use crate::downloads::DownloadManager;
 use crate::passwords::PasswordVault;
 use crate::privacy::PrivacyEngine;
@@ -15,8 +15,8 @@ use libadwaita::prelude::*;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use webkit6::prelude::*;
 use webkit6::UserContentManager;
+use webkit6::prelude::*;
 
 /// Estructura principal del navegador Nika
 pub struct BrowserApp {
@@ -45,11 +45,17 @@ pub struct BrowserApp {
 impl BrowserApp {
     pub fn new(app: &adw::Application, project_dir: PathBuf) -> Rc<Self> {
         let content_manager = UserContentManager::new();
-        let rules_path = project_dir.join("resources").join("rules").join("privacy-rules.json");
-        PrivacyEngine::apply_content_filters(&content_manager, &rules_path);
+        let rules_path = project_dir
+            .join("resources")
+            .join("rules")
+            .join("privacy-rules.json");
+        crate::security::install_internal_bridge(&content_manager);
 
         let settings = Rc::new(RefCell::new(BrowserSettings::load()));
         settings.borrow().apply_dns();
+        if settings.borrow().tracker_blocking {
+            PrivacyEngine::apply_content_filters(&content_manager, &rules_path);
+        }
 
         // Optimización de memoria WebKit: Modelo de caché DocumentBrowser y límites de presión de RAM
         if let Some(ctx) = webkit6::WebContext::default() {
@@ -57,11 +63,11 @@ impl BrowserApp {
         }
 
         let mut mem_settings = webkit6::MemoryPressureSettings::new();
-        mem_settings.set_memory_limit(512);
+        mem_settings.set_memory_limit(1024);
         mem_settings.set_kill_threshold(0.95);
-        mem_settings.set_strict_threshold(0.85);
-        mem_settings.set_conservative_threshold(0.70);
-        mem_settings.set_poll_interval(2.0);
+        mem_settings.set_strict_threshold(0.90);
+        mem_settings.set_conservative_threshold(0.80);
+        mem_settings.set_poll_interval(5.0);
         webkit6::NetworkSession::set_memory_pressure_settings(&mut mem_settings);
 
         let data_dir = glib::user_data_dir().join("nika-browser");
@@ -69,10 +75,8 @@ impl BrowserApp {
         let _ = std::fs::create_dir_all(&data_dir);
         let _ = std::fs::create_dir_all(&cache_dir);
 
-        let persistent_session = webkit6::NetworkSession::new(
-            data_dir.to_str(),
-            cache_dir.to_str(),
-        );
+        let persistent_session =
+            webkit6::NetworkSession::new(data_dir.to_str(), cache_dir.to_str());
 
         if let Some(cm) = persistent_session.cookie_manager() {
             let cookie_path = data_dir.join("cookies.sqlite");
@@ -80,11 +84,11 @@ impl BrowserApp {
                 cookie_path.to_str().unwrap_or("/tmp/nika_cookies.sqlite"),
                 webkit6::CookiePersistentStorage::Sqlite,
             );
-            cm.set_accept_policy(webkit6::CookieAcceptPolicy::Always);
+            cm.set_accept_policy(webkit6::CookieAcceptPolicy::NoThirdParty);
         }
 
         persistent_session.set_persistent_credential_storage_enabled(true);
-        persistent_session.set_itp_enabled(false);
+        persistent_session.set_itp_enabled(true);
 
         if let Some(def_session) = webkit6::NetworkSession::default() {
             if let Some(cm) = def_session.cookie_manager() {
@@ -93,10 +97,10 @@ impl BrowserApp {
                     cookie_path.to_str().unwrap_or("/tmp/nika_cookies.sqlite"),
                     webkit6::CookiePersistentStorage::Sqlite,
                 );
-                cm.set_accept_policy(webkit6::CookieAcceptPolicy::Always);
+                cm.set_accept_policy(webkit6::CookieAcceptPolicy::NoThirdParty);
             }
             def_session.set_persistent_credential_storage_enabled(true);
-            def_session.set_itp_enabled(false);
+            def_session.set_itp_enabled(true);
         }
 
         let home_url = "nika://home".to_string();
@@ -185,8 +189,13 @@ impl BrowserApp {
         let theme_manager = Rc::new(RefCell::new(ThemeManager::new()));
         let password_vault = Rc::new(PasswordVault::new());
         let site_permissions = SitePermissionsManager::new();
-        let permissions_popover = Rc::new(PermissionsPopover::new(&window, site_permissions.clone()));
-        let translation_popover = Rc::new(crate::ui::TranslationPopover::new(&sidebar.translate_btn, settings.clone()));
+        let permissions_popover =
+            Rc::new(PermissionsPopover::new(&window, site_permissions.clone()));
+        let translation_popover = Rc::new(crate::ui::TranslationPopover::new(
+            &sidebar.translate_btn,
+            sidebar.sidebar_card.upcast_ref(),
+            settings.clone(),
+        ));
         let active_media_page = Rc::new(RefCell::new(None));
 
         let browser = Rc::new(Self {
@@ -217,12 +226,18 @@ impl BrowserApp {
         // Script Message Handlers para comunicación bidireccional segura con la página de ajustes
         let s_save = settings.clone();
         let b_save = browser.clone();
-        content_manager.register_script_message_handler("nikaSaveSettings", None);
+        let cm_save = content_manager.clone();
+        let rules_save = rules_path.clone();
+        content_manager.register_script_message_handler(
+            "nikaSaveSettings",
+            Some(crate::security::INTERNAL_WORLD),
+        );
         content_manager.connect_script_message_received(Some("nikaSaveSettings"), move |_, msg| {
             let json_str = msg.to_str();
             if let Ok(new_cfg) = serde_json::from_str::<BrowserSettings>(&json_str) {
                 let old_auto_hide = s_save.borrow().sidebar_auto_hide;
                 let old_lang = s_save.borrow().language.clone();
+                let old_tracker_blocking = s_save.borrow().tracker_blocking;
                 *s_save.borrow_mut() = new_cfg.clone();
                 let _ = new_cfg.save();
                 new_cfg.apply_dns();
@@ -232,6 +247,13 @@ impl BrowserApp {
                 if new_cfg.language != old_lang {
                     b_save.update_language(&new_cfg.language);
                 }
+                if new_cfg.tracker_blocking != old_tracker_blocking {
+                    if new_cfg.tracker_blocking {
+                        PrivacyEngine::apply_content_filters(&cm_save, &rules_save);
+                    } else {
+                        cm_save.remove_all_filters();
+                    }
+                }
             }
         });
 
@@ -239,7 +261,10 @@ impl BrowserApp {
         let s_pick = settings.clone();
         let win_pick = window.clone();
         let b_pick = browser.clone();
-        content_manager.register_script_message_handler("nikaPickFolder", None);
+        content_manager.register_script_message_handler(
+            "nikaPickFolder",
+            Some(crate::security::INTERNAL_WORLD),
+        );
         content_manager.connect_script_message_received(Some("nikaPickFolder"), move |_, _| {
             let file_dialog = gtk4::FileDialog::builder()
                 .title("Seleccionar carpeta de descargas")
@@ -254,13 +279,14 @@ impl BrowserApp {
                         let _ = s_inner.borrow().save();
 
                         // Actualizar la pestaña de configuración web abierta
+                        let path_json = serde_json::to_string(&path_str).unwrap_or_else(|_| "\"\"".to_string());
                         let tabs = b_inner.tabs.borrow();
                         for t in tabs.iter() {
                             let u = t.current_url.borrow();
                             if u.starts_with("nika://settings") {
                                 let js = format!(
-                                    "if (window.updateDownloadDir) {{ window.updateDownloadDir('{}'); }}",
-                                    path_str.replace('\\', "/")
+                                    "if (window.updateDownloadDir) {{ window.updateDownloadDir({}); }}",
+                                    path_json
                                 );
                                 t.webview.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
                             }
@@ -284,63 +310,72 @@ impl BrowserApp {
 
         let pv_onboard = password_vault.clone();
         let b_onboard = browser.clone();
-        content_manager.register_script_message_handler("nikaCompleteOnboarding", None);
-        content_manager.connect_script_message_received(Some("nikaCompleteOnboarding"), move |_, msg| {
-            let json_str = msg.to_str();
-            if let Ok(payload) = serde_json::from_str::<OnboardingPayload>(&json_str) {
-                let mut s = b_onboard.settings.borrow_mut();
-                if let Some(l) = payload.language {
-                    s.language = l;
-                }
-                if let Some(p) = payload.dns_provider {
-                    s.dns_provider = match p.to_lowercase().as_str() {
-                        "cloudflare" | "1" => DnsProvider::Cloudflare,
-                        "google" | "2" => DnsProvider::Google,
-                        "quad9" | "3" => DnsProvider::Quad9,
-                        "adguard" | "4" => DnsProvider::AdGuard,
-                        "system" | "0" => DnsProvider::System,
-                        _ => DnsProvider::Cloudflare,
-                    };
-                }
-                if let Some(d) = payload.doh_enabled {
-                    s.doh_enabled = d;
-                }
-                if let Some(tb) = payload.tracker_blocking {
-                    s.tracker_blocking = tb;
-                }
-                if let Some(bic) = payload.block_insecure_content {
-                    s.block_insecure_content = bic;
-                }
-                if let Some(wlp) = payload.webrtc_leak_protection {
-                    s.webrtc_leak_protection = wlp;
-                }
-                s.onboarding_completed = true;
-                let _ = s.save();
-                s.apply_dns();
-                let lang = s.language.clone();
-                drop(s);
+        content_manager.register_script_message_handler(
+            "nikaCompleteOnboarding",
+            Some(crate::security::INTERNAL_WORLD),
+        );
+        content_manager.connect_script_message_received(
+            Some("nikaCompleteOnboarding"),
+            move |_, msg| {
+                let json_str = msg.to_str();
+                if let Ok(payload) = serde_json::from_str::<OnboardingPayload>(&json_str) {
+                    let mut s = b_onboard.settings.borrow_mut();
+                    if let Some(l) = payload.language {
+                        s.language = l;
+                    }
+                    if let Some(p) = payload.dns_provider {
+                        s.dns_provider = match p.to_lowercase().as_str() {
+                            "cloudflare" | "1" => DnsProvider::Cloudflare,
+                            "google" | "2" => DnsProvider::Google,
+                            "quad9" | "3" => DnsProvider::Quad9,
+                            "adguard" | "4" => DnsProvider::AdGuard,
+                            "system" | "0" => DnsProvider::System,
+                            _ => DnsProvider::Cloudflare,
+                        };
+                    }
+                    if let Some(d) = payload.doh_enabled {
+                        s.doh_enabled = d;
+                    }
+                    if let Some(tb) = payload.tracker_blocking {
+                        s.tracker_blocking = tb;
+                    }
+                    if let Some(bic) = payload.block_insecure_content {
+                        s.block_insecure_content = bic;
+                    }
+                    if let Some(wlp) = payload.webrtc_leak_protection {
+                        s.webrtc_leak_protection = wlp;
+                    }
+                    s.onboarding_completed = true;
+                    let _ = s.save();
+                    s.apply_dns();
+                    let lang = s.language.clone();
+                    drop(s);
 
-                b_onboard.update_language(&lang);
+                    b_onboard.update_language(&lang);
 
-                if let Some(mp) = payload.master_password {
-                    if !mp.trim().is_empty() {
-                        let _ = pv_onboard.setup_master_password(&mp);
+                    if let Some(mp) = payload.master_password {
+                        if !mp.trim().is_empty() {
+                            let _ = pv_onboard.setup_master_password(&mp);
+                        }
+                    }
+
+                    let tabs = b_onboard.tabs.borrow();
+                    for t in tabs.iter() {
+                        let cur = t.current_url.borrow().clone();
+                        if cur == "nika://welcome" {
+                            t.load_uri("nika://home");
+                        }
                     }
                 }
-
-                let tabs = b_onboard.tabs.borrow();
-                for t in tabs.iter() {
-                    let cur = t.current_url.borrow().clone();
-                    if cur == "nika://welcome" {
-                        t.load_uri("nika://home");
-                    }
-                }
-            }
-        });
+            },
+        );
 
         let pv_status = password_vault.clone();
         let b_status = browser.clone();
-        content_manager.register_script_message_handler("nikaGetVaultStatus", None);
+        content_manager.register_script_message_handler(
+            "nikaGetVaultStatus",
+            Some(crate::security::INTERNAL_WORLD),
+        );
         content_manager.connect_script_message_received(Some("nikaGetVaultStatus"), move |_, _| {
             let is_cfg = pv_status.is_configured();
             let is_unlocked = pv_status.is_unlocked();
@@ -349,20 +384,39 @@ impl BrowserApp {
                 "is_configured": is_cfg,
                 "is_unlocked": is_unlocked,
                 "entries_count": count
-            }).to_string();
+            })
+            .to_string();
 
             let tabs = b_status.tabs.borrow();
             for t in tabs.iter() {
                 let u = t.current_url.borrow();
                 if u.starts_with("nika://settings") {
-                    let js = format!("if (window.onVaultStatus) {{ window.onVaultStatus({}); }}", status_json);
-                    t.webview.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
+                    let js = format!(
+                        "if (window.onVaultStatus) {{ window.onVaultStatus({}); }}",
+                        status_json
+                    );
+                    t.webview.evaluate_javascript(
+                        &js,
+                        None,
+                        None,
+                        None::<&gio::Cancellable>,
+                        |_| {},
+                    );
 
                     if is_unlocked {
                         if let Ok(entries) = pv_status.list_entries() {
                             if let Ok(entries_json) = serde_json::to_string(&entries) {
-                                let js_unlocked = format!("if (window.onVaultUnlocked) {{ window.onVaultUnlocked({}); }}", entries_json);
-                                t.webview.evaluate_javascript(&js_unlocked, None, None, None::<&gio::Cancellable>, |_| {});
+                                let js_unlocked = format!(
+                                    "if (window.onVaultUnlocked) {{ window.onVaultUnlocked({}); }}",
+                                    entries_json
+                                );
+                                t.webview.evaluate_javascript(
+                                    &js_unlocked,
+                                    None,
+                                    None,
+                                    None::<&gio::Cancellable>,
+                                    |_| {},
+                                );
                             }
                         }
                     }
@@ -372,7 +426,10 @@ impl BrowserApp {
 
         let pv_setup = password_vault.clone();
         let b_setup = browser.clone();
-        content_manager.register_script_message_handler("nikaSetupVault", None);
+        content_manager.register_script_message_handler(
+            "nikaSetupVault",
+            Some(crate::security::INTERNAL_WORLD),
+        );
         content_manager.connect_script_message_received(Some("nikaSetupVault"), move |_, msg| {
             let master_pass = msg.to_str();
             let res = pv_setup.setup_master_password(&master_pass);
@@ -383,11 +440,28 @@ impl BrowserApp {
                     match res {
                         Ok(()) => {
                             let js = "if (window.onVaultUnlocked) { window.onVaultUnlocked([]); }";
-                            t.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+                            t.webview.evaluate_javascript(
+                                js,
+                                None,
+                                None,
+                                None::<&gio::Cancellable>,
+                                |_| {},
+                            );
                         }
                         Err(ref err) => {
-                            let js = format!("if (window.onVaultAuthError) {{ window.onVaultAuthError('{}'); }}", err.replace('\'', "\\'"));
-                            t.webview.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
+                            let err_json = serde_json::to_string(&err.to_string())
+                                .unwrap_or_else(|_| "\"\"".to_string());
+                            let js = format!(
+                                "if (window.onVaultAuthError) {{ window.onVaultAuthError({}); }}",
+                                err_json
+                            );
+                            t.webview.evaluate_javascript(
+                                &js,
+                                None,
+                                None,
+                                None::<&gio::Cancellable>,
+                                |_| {},
+                            );
                         }
                     }
                 }
@@ -396,7 +470,10 @@ impl BrowserApp {
 
         let pv_unlock = password_vault.clone();
         let b_unlock = browser.clone();
-        content_manager.register_script_message_handler("nikaUnlockVault", None);
+        content_manager.register_script_message_handler(
+            "nikaUnlockVault",
+            Some(crate::security::INTERNAL_WORLD),
+        );
         content_manager.connect_script_message_received(Some("nikaUnlockVault"), move |_, msg| {
             let master_pass = msg.to_str();
             let res = pv_unlock.unlock(&master_pass);
@@ -416,11 +493,13 @@ impl BrowserApp {
                         Ok(false) => {
                             let is_en = b_unlock.settings.borrow().language == "en";
                             let err_msg = if is_en { "Incorrect master password." } else { "Contraseña maestra incorrecta." };
-                            let js = format!("if (window.onVaultAuthError) {{ window.onVaultAuthError('{}'); }}", err_msg);
+                            let err_json = serde_json::to_string(err_msg).unwrap_or_else(|_| "\"\"".to_string());
+                            let js = format!("if (window.onVaultAuthError) {{ window.onVaultAuthError({}); }}", err_json);
                             t.webview.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
                         }
                         Err(ref e) => {
-                            let js = format!("if (window.onVaultAuthError) {{ window.onVaultAuthError('{}'); }}", e.replace('\'', "\\'"));
+                            let err_json = serde_json::to_string(&e.to_string()).unwrap_or_else(|_| "\"\"".to_string());
+                            let js = format!("if (window.onVaultAuthError) {{ window.onVaultAuthError({}); }}", err_json);
                             t.webview.evaluate_javascript(&js, None, None, None::<&gio::Cancellable>, |_| {});
                         }
                     }
@@ -430,7 +509,10 @@ impl BrowserApp {
 
         let pv_lock = password_vault.clone();
         let b_lock = browser.clone();
-        content_manager.register_script_message_handler("nikaLockVault", None);
+        content_manager.register_script_message_handler(
+            "nikaLockVault",
+            Some(crate::security::INTERNAL_WORLD),
+        );
         content_manager.connect_script_message_received(Some("nikaLockVault"), move |_, _| {
             pv_lock.lock();
             let tabs = b_lock.tabs.borrow();
@@ -438,7 +520,13 @@ impl BrowserApp {
                 let u = t.current_url.borrow();
                 if u.starts_with("nika://settings") {
                     let js = "if (window.onVaultLocked) { window.onVaultLocked(); }";
-                    t.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+                    t.webview.evaluate_javascript(
+                        js,
+                        None,
+                        None,
+                        None::<&gio::Cancellable>,
+                        |_| {},
+                    );
                 }
             }
         });
@@ -452,7 +540,10 @@ impl BrowserApp {
 
         let pv_save_pass = password_vault.clone();
         let b_save_pass = browser.clone();
-        content_manager.register_script_message_handler("nikaSavePassword", None);
+        content_manager.register_script_message_handler(
+            "nikaSavePassword",
+            Some(crate::security::INTERNAL_WORLD),
+        );
         content_manager.connect_script_message_received(Some("nikaSavePassword"), move |_, msg| {
             let json_str = msg.to_str();
             if let Ok(payload) = serde_json::from_str::<SavePassPayload>(&json_str) {
@@ -475,7 +566,10 @@ impl BrowserApp {
 
         let pv_del_pass = password_vault.clone();
         let b_del_pass = browser.clone();
-        content_manager.register_script_message_handler("nikaDeletePassword", None);
+        content_manager.register_script_message_handler(
+            "nikaDeletePassword",
+            Some(crate::security::INTERNAL_WORLD),
+        );
         content_manager.connect_script_message_received(Some("nikaDeletePassword"), move |_, msg| {
             let id = msg.to_str();
             if pv_del_pass.delete_entry(&id).is_ok() {
@@ -503,13 +597,16 @@ impl BrowserApp {
             }
         ));
 
-        browser.sidebar.new_incognito_tab_btn.connect_clicked(clone!(
-            #[strong]
-            browser,
-            move |_| {
-                browser.add_tab_incognito(&browser.home_url);
-            }
-        ));
+        browser
+            .sidebar
+            .new_incognito_tab_btn
+            .connect_clicked(clone!(
+                #[strong]
+                browser,
+                move |_| {
+                    browser.add_tab_incognito(&browser.home_url);
+                }
+            ));
 
         // Eventos del buscador en página (Ctrl+F)
         let find_key = gtk4::EventControllerKey::new();
@@ -538,7 +635,11 @@ impl BrowserApp {
                             browser.find_bar.count_label.set_text("");
                         } else {
                             find.search(&q, webkit6::FindOptions::CASE_INSENSITIVE.bits(), 100);
-                            find.count_matches(&q, webkit6::FindOptions::CASE_INSENSITIVE.bits(), 100);
+                            find.count_matches(
+                                &q,
+                                webkit6::FindOptions::CASE_INSENSITIVE.bits(),
+                                100,
+                            );
                         }
                     }
                 }
@@ -624,7 +725,31 @@ impl BrowserApp {
                     | webkit6::WebsiteDataTypes::LOCAL_STORAGE
                     | webkit6::WebsiteDataTypes::INDEXEDDB_DATABASES
                     | webkit6::WebsiteDataTypes::DOM_CACHE;
-                wdm.clear(types, glib::TimeSpan::from_seconds(0), None::<&gio::Cancellable>, |_| {});
+                let host_lower = host.to_lowercase();
+                let wdm_fetch = wdm.clone();
+                wdm.fetch(types, None::<&gio::Cancellable>, move |res| {
+                    let Ok(entries) = res else { return };
+                    let suffix = format!(".{}", host_lower);
+                    let origin = format!("//{}", host_lower);
+                    let matching: Vec<&webkit6::WebsiteData> = entries
+                        .iter()
+                        .filter(|data| {
+                            data.name()
+                                .map(|name| {
+                                    let name = name.to_lowercase();
+                                    name == host_lower
+                                        || name.ends_with(&suffix)
+                                        || name.starts_with(&format!("{}:", host_lower))
+                                        || name.contains(&origin)
+                                })
+                                .unwrap_or(false)
+                        })
+                        .collect();
+
+                    if !matching.is_empty() {
+                        wdm_fetch.remove(types, &matching, None::<&gio::Cancellable>, |_| {});
+                    }
+                });
             }
             println!("[Nika] 🍪 Datos y cookies borrados para el sitio: {}", host);
         });
@@ -671,9 +796,11 @@ impl BrowserApp {
 
         // Conectar acciones del popover de traducción
         let b_trans = browser.clone();
-        browser.translation_popover.set_on_translate(move |target_lang| {
-            b_trans.translate_active_page(&target_lang);
-        });
+        browser
+            .translation_popover
+            .set_on_translate(move |target_lang| {
+                b_trans.translate_active_page(&target_lang);
+            });
 
         let b_rest = browser.clone();
         browser.translation_popover.set_on_restore(move || {
@@ -724,14 +851,15 @@ impl BrowserApp {
 
         // Periódico para refrescar estado de reproducción multimedia en la barra superior
         let b_media_poll = browser.clone();
-        glib::timeout_add_local(std::time::Duration::from_millis(1500), move || {
+        glib::timeout_add_local(std::time::Duration::from_millis(3000), move || {
             let tabs = b_media_poll.tabs.borrow();
             // Buscar la pestaña activa o cualquiera que esté sonando/reproduciendo
             let candidate = if let Some(ref p) = *b_media_poll.active_media_page.borrow() {
                 tabs.iter().find(|t| t.page == *p)
             } else {
                 tabs.iter().find(|t| t.webview.is_playing_audio())
-            }.or_else(|| {
+            }
+            .or_else(|| {
                 // Si no hay ninguna con audio sonando, revisar la pestaña seleccionada actualmente
                 if let Some(sel) = b_media_poll.tab_view.selected_page() {
                     tabs.iter().find(|t| t.page == sel)
@@ -768,25 +896,31 @@ impl BrowserApp {
                     })()
                 "#;
 
-                tab.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, move |res| {
-                    if let Ok(val) = res {
-                        let json_str = val.to_str();
-                        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str) {
-                            let has_media = parsed["has_media"].as_bool().unwrap_or(false) || is_playing_audio;
-                            let paused = parsed["paused"].as_bool().unwrap_or(true);
-                            if has_media {
-                                *active_page_rc.borrow_mut() = Some(page);
-                                hdr.set_media_playing_state(!paused);
-                                hdr.show_media_controls();
+                tab.webview.evaluate_javascript(
+                    js,
+                    None,
+                    None,
+                    None::<&gio::Cancellable>,
+                    move |res| {
+                        if let Ok(val) = res {
+                            let json_str = val.to_str();
+                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str)
+                            {
+                                let has_media = parsed["has_media"].as_bool().unwrap_or(false)
+                                    || is_playing_audio;
+                                let paused = parsed["paused"].as_bool().unwrap_or(true);
+                                if has_media {
+                                    *active_page_rc.borrow_mut() = Some(page);
+                                    hdr.set_media_playing_state(!paused);
+                                    hdr.show_media_controls();
+                                }
                             }
                         }
-                    }
-                });
+                    },
+                );
             }
             glib::ControlFlow::Continue
         });
-
-
 
         // Botones de navegación
         browser.header.btn_back.connect_clicked(clone!(
@@ -842,8 +976,6 @@ impl BrowserApp {
             }
         ));
 
-
-
         // Sincronización al cambiar de pestaña
         tab_view.connect_selected_page_notify(clone!(
             #[strong]
@@ -865,7 +997,11 @@ impl BrowserApp {
                         if let Some(tab) = browser.get_active_tab() {
                             if let Some(find) = tab.webview.find_controller() {
                                 find.search(&q, webkit6::FindOptions::CASE_INSENSITIVE.bits(), 100);
-                                find.count_matches(&q, webkit6::FindOptions::CASE_INSENSITIVE.bits(), 100);
+                                find.count_matches(
+                                    &q,
+                                    webkit6::FindOptions::CASE_INSENSITIVE.bits(),
+                                    100,
+                                );
                             }
                         }
                     }
@@ -979,13 +1115,20 @@ impl BrowserApp {
                 }
 
                 // Ctrl + Shift + N: Incógnito
-                if is_ctrl && is_shift && (keyval == gtk4::gdk::Key::n || keyval == gtk4::gdk::Key::N) {
+                if is_ctrl
+                    && is_shift
+                    && (keyval == gtk4::gdk::Key::n || keyval == gtk4::gdk::Key::N)
+                {
                     browser.add_tab_incognito(&browser.home_url);
                     return glib::Propagation::Stop;
                 }
 
                 // Zoom In: Ctrl + Plus, Ctrl + =, KP_Add
-                if is_ctrl && (keyval == gtk4::gdk::Key::plus || keyval == gtk4::gdk::Key::equal || keyval == gtk4::gdk::Key::KP_Add) {
+                if is_ctrl
+                    && (keyval == gtk4::gdk::Key::plus
+                        || keyval == gtk4::gdk::Key::equal
+                        || keyval == gtk4::gdk::Key::KP_Add)
+                {
                     if let Some(tab) = browser.get_active_tab() {
                         let z = tab.zoom_in();
                         browser.show_zoom_toast(z);
@@ -994,7 +1137,9 @@ impl BrowserApp {
                 }
 
                 // Zoom Out: Ctrl + Minus, KP_Subtract
-                if is_ctrl && (keyval == gtk4::gdk::Key::minus || keyval == gtk4::gdk::Key::KP_Subtract) {
+                if is_ctrl
+                    && (keyval == gtk4::gdk::Key::minus || keyval == gtk4::gdk::Key::KP_Subtract)
+                {
                     if let Some(tab) = browser.get_active_tab() {
                         let z = tab.zoom_out();
                         browser.show_zoom_toast(z);
@@ -1040,13 +1185,19 @@ impl BrowserApp {
                 }
 
                 // Ctrl + Shift + C: Copiar URL actual al portapapeles
-                if is_ctrl && is_shift && (keyval == gtk4::gdk::Key::c || keyval == gtk4::gdk::Key::C) {
+                if is_ctrl
+                    && is_shift
+                    && (keyval == gtk4::gdk::Key::c || keyval == gtk4::gdk::Key::C)
+                {
                     browser.copy_current_url_with_feedback();
                     return glib::Propagation::Stop;
                 }
 
                 // Alt + Shift + T: Opciones de traducción
-                if is_alt && is_shift && (keyval == gtk4::gdk::Key::t || keyval == gtk4::gdk::Key::T) {
+                if is_alt
+                    && is_shift
+                    && (keyval == gtk4::gdk::Key::t || keyval == gtk4::gdk::Key::T)
+                {
                     browser.sidebar.revealer.set_reveal_child(true);
                     browser.sidebar.on_popover_opened();
                     browser.translation_popover.popup();
@@ -1054,13 +1205,17 @@ impl BrowserApp {
                 }
 
                 // Alt + T: Alternar traducción de página
-                if is_alt && !is_ctrl && (keyval == gtk4::gdk::Key::t || keyval == gtk4::gdk::Key::T) {
+                if is_alt
+                    && !is_ctrl
+                    && (keyval == gtk4::gdk::Key::t || keyval == gtk4::gdk::Key::T)
+                {
                     browser.toggle_page_translation();
                     return glib::Propagation::Stop;
                 }
 
                 // Ctrl + , : Configuración
-                if is_ctrl && (keyval == gtk4::gdk::Key::comma || keyval == gtk4::gdk::Key::period) {
+                if is_ctrl && (keyval == gtk4::gdk::Key::comma || keyval == gtk4::gdk::Key::period)
+                {
                     browser.open_or_switch_to_settings();
                     return glib::Propagation::Stop;
                 }
@@ -1090,7 +1245,13 @@ impl BrowserApp {
                 }
 
                 // Reordenar pestaña hacia arriba
-                if is_alt && is_shift && (keyval == gtk4::gdk::Key::Up || keyval == gtk4::gdk::Key::KP_Up || keyval == gtk4::gdk::Key::Left || keyval == gtk4::gdk::Key::KP_Left) {
+                if is_alt
+                    && is_shift
+                    && (keyval == gtk4::gdk::Key::Up
+                        || keyval == gtk4::gdk::Key::KP_Up
+                        || keyval == gtk4::gdk::Key::Left
+                        || keyval == gtk4::gdk::Key::KP_Left)
+                {
                     if let Some(page) = browser.tab_view.selected_page() {
                         browser.move_tab_by_page(&page, -1);
                     }
@@ -1098,7 +1259,13 @@ impl BrowserApp {
                 }
 
                 // Reordenar pestaña hacia abajo
-                if is_alt && is_shift && (keyval == gtk4::gdk::Key::Down || keyval == gtk4::gdk::Key::KP_Down || keyval == gtk4::gdk::Key::Right || keyval == gtk4::gdk::Key::KP_Right) {
+                if is_alt
+                    && is_shift
+                    && (keyval == gtk4::gdk::Key::Down
+                        || keyval == gtk4::gdk::Key::KP_Down
+                        || keyval == gtk4::gdk::Key::Right
+                        || keyval == gtk4::gdk::Key::KP_Right)
+                {
                     if let Some(page) = browser.tab_view.selected_page() {
                         browser.move_tab_by_page(&page, 1);
                     }
@@ -1106,13 +1273,23 @@ impl BrowserApp {
                 }
 
                 // Ctrl + Tab o Ctrl + Page_Down: Siguiente pestaña
-                if (is_ctrl && !is_shift && keyval == gtk4::gdk::Key::Tab) || (is_ctrl && (keyval == gtk4::gdk::Key::Page_Down || keyval == gtk4::gdk::Key::KP_Page_Down)) {
+                if (is_ctrl && !is_shift && keyval == gtk4::gdk::Key::Tab)
+                    || (is_ctrl
+                        && (keyval == gtk4::gdk::Key::Page_Down
+                            || keyval == gtk4::gdk::Key::KP_Page_Down))
+                {
                     browser.select_adjacent_tab(1);
                     return glib::Propagation::Stop;
                 }
 
                 // Ctrl + Shift + Tab o Ctrl + Page_Up: Pestaña anterior
-                if (is_ctrl && is_shift && (keyval == gtk4::gdk::Key::Tab || keyval == gtk4::gdk::Key::ISO_Left_Tab)) || (is_ctrl && (keyval == gtk4::gdk::Key::Page_Up || keyval == gtk4::gdk::Key::KP_Page_Up)) {
+                if (is_ctrl
+                    && is_shift
+                    && (keyval == gtk4::gdk::Key::Tab || keyval == gtk4::gdk::Key::ISO_Left_Tab))
+                    || (is_ctrl
+                        && (keyval == gtk4::gdk::Key::Page_Up
+                            || keyval == gtk4::gdk::Key::KP_Page_Up))
+                {
                     browser.select_adjacent_tab(-1);
                     return glib::Propagation::Stop;
                 }
@@ -1130,7 +1307,9 @@ impl BrowserApp {
         } else {
             // Restaurar sesión previa o abrir pestaña de inicio
             let should_restore = browser.settings.borrow().restore_session;
-            let session_file = glib::user_config_dir().join("nika-browser").join("session.json");
+            let session_file = glib::user_config_dir()
+                .join("nika-browser")
+                .join("session.json");
             let mut restored = false;
 
             if should_restore && session_file.exists() {
@@ -1220,23 +1399,33 @@ impl BrowserApp {
                 } else {
                     let has_other_playing = {
                         let tabs = tabs_for_audio.borrow();
-                        tabs.iter().any(|t| t.page != page_audio && t.webview.is_playing_audio())
+                        tabs.iter()
+                            .any(|t| t.page != page_audio && t.webview.is_playing_audio())
                     };
                     if !has_other_playing {
                         header_rc.set_media_playing_state(false);
                         let hdr = header_rc.clone();
                         let act = active_media_rc.clone();
                         let tabs_check = tabs_for_audio.clone();
-                        glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
-                            let still_playing = tabs_check.borrow().iter().any(|t| t.webview.is_playing_audio());
-                            if !still_playing {
-                                hdr.hide_media_controls();
-                                *act.borrow_mut() = None;
-                            }
-                        });
+                        glib::timeout_add_local_once(
+                            std::time::Duration::from_millis(2500),
+                            move || {
+                                let still_playing = tabs_check
+                                    .borrow()
+                                    .iter()
+                                    .any(|t| t.webview.is_playing_audio());
+                                if !still_playing {
+                                    hdr.hide_media_controls();
+                                    *act.borrow_mut() = None;
+                                }
+                            },
+                        );
                     } else {
                         let tabs = tabs_for_audio.borrow();
-                        if let Some(other) = tabs.iter().find(|t| t.page != page_audio && t.webview.is_playing_audio()) {
+                        if let Some(other) = tabs
+                            .iter()
+                            .find(|t| t.page != page_audio && t.webview.is_playing_audio())
+                        {
                             *active_media_rc.borrow_mut() = Some(other.page.clone());
                             header_rc.set_media_playing_state(true);
                             header_rc.show_media_controls();
@@ -1369,32 +1558,69 @@ impl BrowserApp {
                 if tab.page == selected_page {
                     tab.tab_pill.add_css_class("active");
                     let url = tab.current_url.borrow().clone();
-                    if !url.starts_with("file://") && url != "nika://home" && url != "http://localhost/" {
+                    if !url.starts_with("file://")
+                        && url != "nika://home"
+                        && url != "http://localhost/"
+                    {
                         self.header.omnibox.set_text(&url);
                     } else {
                         self.header.omnibox.set_text("");
                     }
                     if tab.is_incognito {
-                        self.header.omnibox.set_primary_icon_name(Some("nika-incognito-symbolic"));
-                        self.header.omnibox.set_primary_icon_tooltip_text(Some(crate::i18n::tr(&lang, "incognito_tab")));
+                        self.header
+                            .omnibox
+                            .set_primary_icon_name(Some("nika-incognito-symbolic"));
+                        self.header
+                            .omnibox
+                            .set_primary_icon_tooltip_text(Some(crate::i18n::tr(
+                                &lang,
+                                "incognito_tab",
+                            )));
                     } else if url.starts_with("https://") {
-                        self.header.omnibox.set_primary_icon_name(Some("channel-secure-symbolic"));
-                        self.header.omnibox.set_primary_icon_tooltip_text(Some(if lang == "en" { "Encrypted Secure Connection (HTTPS)" } else { "Conexión Segura Cifrada (HTTPS)" }));
+                        self.header
+                            .omnibox
+                            .set_primary_icon_name(Some("channel-secure-symbolic"));
+                        self.header
+                            .omnibox
+                            .set_primary_icon_tooltip_text(Some(if lang == "en" {
+                                "Encrypted Secure Connection (HTTPS)"
+                            } else {
+                                "Conexión Segura Cifrada (HTTPS)"
+                            }));
                     } else if url.starts_with("http://") {
-                        self.header.omnibox.set_primary_icon_name(Some("dialog-warning-symbolic"));
-                        self.header.omnibox.set_primary_icon_tooltip_text(Some(if lang == "en" { "Insecure Connection (HTTP)" } else { "Conexión No Segura (HTTP)" }));
+                        self.header
+                            .omnibox
+                            .set_primary_icon_name(Some("dialog-warning-symbolic"));
+                        self.header
+                            .omnibox
+                            .set_primary_icon_tooltip_text(Some(if lang == "en" {
+                                "Insecure Connection (HTTP)"
+                            } else {
+                                "Conexión No Segura (HTTP)"
+                            }));
                     } else {
-                        self.header.omnibox.set_primary_icon_name(Some("security-high-symbolic"));
-                        self.header.omnibox.set_primary_icon_tooltip_text(Some(crate::i18n::tr(&lang, "omnibox_shield_tooltip")));
+                        self.header
+                            .omnibox
+                            .set_primary_icon_name(Some("security-high-symbolic"));
+                        self.header
+                            .omnibox
+                            .set_primary_icon_tooltip_text(Some(crate::i18n::tr(
+                                &lang,
+                                "omnibox_shield_tooltip",
+                            )));
                     }
 
                     // Sincronizar estado del botón de recarga
                     if *tab.is_loading.borrow() {
                         self.header.reload_btn.set_icon_name("nika-close-symbolic");
-                        self.header.reload_btn.set_tooltip_text(Some(crate::i18n::tr(&lang, "stop_loading")));
+                        self.header
+                            .reload_btn
+                            .set_tooltip_text(Some(crate::i18n::tr(&lang, "stop_loading")));
                     } else {
                         self.header.reload_btn.set_icon_name("nika-reload-symbolic");
-                        self.header.reload_btn.set_tooltip_text(Some(crate::i18n::tr(&lang, "nav_reload")));
+                        self.header
+                            .reload_btn
+                            .set_tooltip_text(Some(crate::i18n::tr(&lang, "nav_reload")));
                     }
                 } else {
                     tab.tab_pill.remove_css_class("active");
@@ -1416,22 +1642,35 @@ impl BrowserApp {
         for tab in tabs.iter() {
             let url = tab.current_url.borrow().clone();
             if url.starts_with("nika://settings") {
-                let title = if lang == "en" { "Settings" } else { "Configuración" };
+                let title = if lang == "en" {
+                    "Settings"
+                } else {
+                    "Configuración"
+                };
                 tab.title_label.set_text(title);
                 tab.page.set_title(title);
             } else if url == "nika://welcome" {
-                let title = if lang == "en" { "Welcome" } else { "Bienvenida" };
+                let title = if lang == "en" {
+                    "Welcome"
+                } else {
+                    "Bienvenida"
+                };
                 tab.title_label.set_text(title);
                 tab.page.set_title(title);
             } else if url == "nika://home" || url.is_empty() {
                 let title = if tab.is_incognito {
-                    if lang == "en" { "Private tab" } else { "Pestaña privada" }
+                    if lang == "en" {
+                        "Private tab"
+                    } else {
+                        "Pestaña privada"
+                    }
                 } else {
                     if lang == "en" { "Home" } else { "Inicio" }
                 };
                 tab.title_label.set_text(title);
                 tab.page.set_title(title);
             }
+            tab.update_audio_state();
         }
     }
 
@@ -1482,8 +1721,12 @@ impl BrowserApp {
     /// Elimina caché y almacenamiento temporal por motivos de seguridad y privacidad
     pub fn clear_cache(&self) {
         let cache_dirs = [
-            glib::user_cache_dir().join("nika-browser").join("WebKitCache"),
-            glib::user_cache_dir().join("nika-browser").join("CacheStorage"),
+            glib::user_cache_dir()
+                .join("nika-browser")
+                .join("WebKitCache"),
+            glib::user_cache_dir()
+                .join("nika-browser")
+                .join("CacheStorage"),
             glib::user_cache_dir().join("nika-browser").join("HSTS"),
         ];
         for d in &cache_dirs {
@@ -1497,7 +1740,12 @@ impl BrowserApp {
                 | webkit6::WebsiteDataTypes::MEMORY_CACHE
                 | webkit6::WebsiteDataTypes::DOM_CACHE
                 | webkit6::WebsiteDataTypes::OFFLINE_APPLICATION_CACHE;
-            wdm.clear(types, glib::TimeSpan::from_seconds(0), None::<&gio::Cancellable>, |_| {});
+            wdm.clear(
+                types,
+                glib::TimeSpan::from_seconds(0),
+                None::<&gio::Cancellable>,
+                |_| {},
+            );
         }
         println!("[Nika] 🧹 Caché y almacenamiento temporal eliminados por seguridad.");
     }
@@ -1516,8 +1764,14 @@ impl BrowserApp {
 
         let lang = self.settings.borrow().language.clone();
         entry.clipboard().set_text(&url_to_copy);
-        entry.set_icon_from_icon_name(gtk4::EntryIconPosition::Secondary, Some("nika-check-symbolic"));
-        entry.set_icon_tooltip_text(gtk4::EntryIconPosition::Secondary, Some(crate::i18n::tr(&lang, "copied")));
+        entry.set_icon_from_icon_name(
+            gtk4::EntryIconPosition::Secondary,
+            Some("nika-check-symbolic"),
+        );
+        entry.set_icon_tooltip_text(
+            gtk4::EntryIconPosition::Secondary,
+            Some(crate::i18n::tr(&lang, "copied")),
+        );
 
         let lang_clone = lang.clone();
         glib::timeout_add_local_once(
@@ -1526,8 +1780,14 @@ impl BrowserApp {
                 #[weak]
                 entry,
                 move || {
-                    entry.set_icon_from_icon_name(gtk4::EntryIconPosition::Secondary, Some("nika-copy-symbolic"));
-                    entry.set_icon_tooltip_text(gtk4::EntryIconPosition::Secondary, Some(crate::i18n::tr(&lang_clone, "copy_url")));
+                    entry.set_icon_from_icon_name(
+                        gtk4::EntryIconPosition::Secondary,
+                        Some("nika-copy-symbolic"),
+                    );
+                    entry.set_icon_tooltip_text(
+                        gtk4::EntryIconPosition::Secondary,
+                        Some(crate::i18n::tr(&lang_clone, "copy_url")),
+                    );
                 }
             ),
         );
@@ -1544,13 +1804,21 @@ impl BrowserApp {
             let lang = self.settings.borrow().language.clone();
             if is_trans {
                 self.sidebar.translate_btn.add_css_class("translate-active");
-                self.sidebar.translate_btn.set_tooltip_text(Some(crate::i18n::tr(&lang, "translate_active_tooltip")));
+                self.sidebar
+                    .translate_btn
+                    .set_tooltip_text(Some(crate::i18n::tr(&lang, "translate_active_tooltip")));
             } else {
-                self.sidebar.translate_btn.remove_css_class("translate-active");
-                self.sidebar.translate_btn.set_tooltip_text(Some(crate::i18n::tr(&lang, "nav_translate")));
+                self.sidebar
+                    .translate_btn
+                    .remove_css_class("translate-active");
+                self.sidebar
+                    .translate_btn
+                    .set_tooltip_text(Some(crate::i18n::tr(&lang, "nav_translate")));
             }
         } else {
-            self.sidebar.translate_btn.remove_css_class("translate-active");
+            self.sidebar
+                .translate_btn
+                .remove_css_class("translate-active");
         }
     }
 
@@ -1558,7 +1826,11 @@ impl BrowserApp {
     pub fn toggle_page_translation(&self) {
         if let Some(tab) = self.get_active_tab() {
             let current_url = tab.current_url.borrow().clone();
-            if current_url.starts_with("nika://") || current_url.starts_with("file://") || current_url == "about:blank" || current_url.is_empty() {
+            if current_url.starts_with("nika://")
+                || current_url.starts_with("file://")
+                || current_url == "about:blank"
+                || current_url.is_empty()
+            {
                 return;
             }
 
@@ -1579,7 +1851,11 @@ impl BrowserApp {
     pub fn translate_active_page(&self, target_lang: &str) {
         if let Some(tab) = self.get_active_tab() {
             let current_url = tab.current_url.borrow().clone();
-            if current_url.starts_with("nika://") || current_url.starts_with("file://") || current_url == "about:blank" || current_url.is_empty() {
+            if current_url.starts_with("nika://")
+                || current_url.starts_with("file://")
+                || current_url == "about:blank"
+                || current_url.is_empty()
+            {
                 return;
             }
 
@@ -1594,10 +1870,16 @@ impl BrowserApp {
             self.sidebar.translate_btn.add_css_class("translate-active");
 
             let lang = self.settings.borrow().language.clone();
-            self.sidebar.translate_btn.set_tooltip_text(Some(crate::i18n::tr(&lang, "translate_active_tooltip")));
+            self.sidebar
+                .translate_btn
+                .set_tooltip_text(Some(crate::i18n::tr(&lang, "translate_active_tooltip")));
 
-            let encoded: String = url::form_urlencoded::byte_serialize(base_url.as_bytes()).collect();
-            let translate_url = format!("https://translate.google.com/translate?sl=auto&tl={}&u={}", target_lang, encoded);
+            let encoded: String =
+                url::form_urlencoded::byte_serialize(base_url.as_bytes()).collect();
+            let translate_url = format!(
+                "https://translate.google.com/translate?sl=auto&tl={}&u={}",
+                target_lang, encoded
+            );
             tab.load_uri(&translate_url);
         }
     }
@@ -1609,7 +1891,8 @@ impl BrowserApp {
             let orig = if let Some(ref o) = *tab.original_url.borrow() {
                 o.clone()
             } else if let Ok(parsed) = url::Url::parse(&current_url) {
-                parsed.query_pairs()
+                parsed
+                    .query_pairs()
                     .find(|(k, _)| k == "u")
                     .map(|(_, v)| v.to_string())
                     .unwrap_or(current_url)
@@ -1619,10 +1902,14 @@ impl BrowserApp {
 
             *tab.is_translated.borrow_mut() = false;
             *tab.original_url.borrow_mut() = None;
-            self.sidebar.translate_btn.remove_css_class("translate-active");
+            self.sidebar
+                .translate_btn
+                .remove_css_class("translate-active");
 
             let lang = self.settings.borrow().language.clone();
-            self.sidebar.translate_btn.set_tooltip_text(Some(crate::i18n::tr(&lang, "nav_translate")));
+            self.sidebar
+                .translate_btn
+                .set_tooltip_text(Some(crate::i18n::tr(&lang, "nav_translate")));
 
             tab.load_uri(&orig);
         }
@@ -1635,26 +1922,38 @@ impl BrowserApp {
             let lang = self.settings.borrow().language.clone();
             let is_en = lang == "en";
             if url.starts_with("https://") {
-                self.header.omnibox.set_primary_icon_name(Some("security-high-symbolic"));
-                self.header.omnibox.set_primary_icon_tooltip_text(Some(if is_en {
-                    "Secure Connection (HTTPS) • Click for site permissions"
-                } else {
-                    "Conexión Segura Cifrada (HTTPS) • Clic para ver permisos"
-                }));
+                self.header
+                    .omnibox
+                    .set_primary_icon_name(Some("security-high-symbolic"));
+                self.header
+                    .omnibox
+                    .set_primary_icon_tooltip_text(Some(if is_en {
+                        "Secure Connection (HTTPS) • Click for site permissions"
+                    } else {
+                        "Conexión Segura Cifrada (HTTPS) • Clic para ver permisos"
+                    }));
             } else if url.starts_with("http://") {
-                self.header.omnibox.set_primary_icon_name(Some("dialog-warning-symbolic"));
-                self.header.omnibox.set_primary_icon_tooltip_text(Some(if is_en {
-                    "Insecure Connection (HTTP) • Click for site permissions"
-                } else {
-                    "Conexión No Segura (HTTP) • Clic para ver permisos"
-                }));
+                self.header
+                    .omnibox
+                    .set_primary_icon_name(Some("dialog-warning-symbolic"));
+                self.header
+                    .omnibox
+                    .set_primary_icon_tooltip_text(Some(if is_en {
+                        "Insecure Connection (HTTP) • Click for site permissions"
+                    } else {
+                        "Conexión No Segura (HTTP) • Clic para ver permisos"
+                    }));
             } else {
-                self.header.omnibox.set_primary_icon_name(Some("security-high-symbolic"));
-                self.header.omnibox.set_primary_icon_tooltip_text(Some(if is_en {
-                    "Nika System Page • Click for site permissions"
-                } else {
-                    "Página del sistema Nika • Clic para ver permisos"
-                }));
+                self.header
+                    .omnibox
+                    .set_primary_icon_name(Some("security-high-symbolic"));
+                self.header
+                    .omnibox
+                    .set_primary_icon_tooltip_text(Some(if is_en {
+                        "Nika System Page • Click for site permissions"
+                    } else {
+                        "Página del sistema Nika • Clic para ver permisos"
+                    }));
             }
         }
     }
@@ -1722,12 +2021,18 @@ impl BrowserApp {
                     return false;
                 })()
             "#;
-            tab.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, move |res| {
-                if let Ok(val) = res {
-                    let is_paused = val.to_str() == "true";
-                    header.set_media_playing_state(!is_paused);
-                }
-            });
+            tab.webview.evaluate_javascript(
+                js,
+                None,
+                None,
+                None::<&gio::Cancellable>,
+                move |res| {
+                    if let Ok(val) = res {
+                        let is_paused = val.to_str() == "true";
+                        header.set_media_playing_state(!is_paused);
+                    }
+                },
+            );
         }
     }
 
@@ -1759,7 +2064,8 @@ impl BrowserApp {
                     })()
                 "#
             };
-            tab.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+            tab.webview
+                .evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
         }
     }
 

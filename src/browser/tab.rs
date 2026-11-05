@@ -86,10 +86,23 @@ impl BrowserTab {
             let has_site = perms_mgr.has_site(&host);
             let perms = perms_mgr.get_permissions(&host);
 
+            // Las páginas internas (nika://) son de confianza y requieren portapapeles
+            if host == "nika://internal" {
+                request.allow();
+                return true;
+            }
+
             // 1. Notificaciones
-            if let Ok(n) = request.clone().downcast::<webkit6::NotificationPermissionRequest>() {
+            if let Ok(n) = request
+                .clone()
+                .downcast::<webkit6::NotificationPermissionRequest>()
+            {
                 if has_site {
-                    if perms.notifications { n.allow(); } else { n.deny(); }
+                    if perms.notifications {
+                        n.allow();
+                    } else {
+                        n.deny();
+                    }
                     return true;
                 }
                 // Si aún no se ha configurado, solicitar al usuario
@@ -103,7 +116,8 @@ impl BrowserTab {
                     let body = if is_en {
                         "This website would like to show notifications on your desktop.".to_string()
                     } else {
-                        "Este sitio web desea mostrarte notificaciones y avisos en el escritorio.".to_string()
+                        "Este sitio web desea mostrarte notificaciones y avisos en el escritorio."
+                            .to_string()
                     };
                     let dialog = adw::AlertDialog::builder()
                         .heading(&heading)
@@ -123,7 +137,11 @@ impl BrowserTab {
                         let mut p = p_mgr.get_permissions(&h);
                         p.notifications = allow;
                         p_mgr.set_permissions(&h, p);
-                        if allow { req.allow(); } else { req.deny(); }
+                        if allow {
+                            req.allow();
+                        } else {
+                            req.deny();
+                        }
                     });
                     dialog.present(Some(&win));
                     return true;
@@ -133,9 +151,16 @@ impl BrowserTab {
             }
 
             // 2. Ubicación / Geolocalización
-            if let Ok(g) = request.clone().downcast::<webkit6::GeolocationPermissionRequest>() {
+            if let Ok(g) = request
+                .clone()
+                .downcast::<webkit6::GeolocationPermissionRequest>()
+            {
                 if has_site {
-                    if perms.geolocation { g.allow(); } else { g.deny(); }
+                    if perms.geolocation {
+                        g.allow();
+                    } else {
+                        g.deny();
+                    }
                     return true;
                 }
                 if let Some(win) = window_weak.upgrade() {
@@ -148,7 +173,8 @@ impl BrowserTab {
                     let body = if is_en {
                         "This website would like to access your geographic location.".to_string()
                     } else {
-                        "Este sitio web ha solicitado permiso para conocer tu posición geográfica.".to_string()
+                        "Este sitio web ha solicitado permiso para conocer tu posición geográfica."
+                            .to_string()
                     };
                     let dialog = adw::AlertDialog::builder()
                         .heading(&heading)
@@ -168,7 +194,11 @@ impl BrowserTab {
                         let mut p = p_mgr.get_permissions(&h);
                         p.geolocation = allow;
                         p_mgr.set_permissions(&h, p);
-                        if allow { req.allow(); } else { req.deny(); }
+                        if allow {
+                            req.allow();
+                        } else {
+                            req.deny();
+                        }
                     });
                     dialog.present(Some(&win));
                     return true;
@@ -178,32 +208,59 @@ impl BrowserTab {
             }
 
             // 3. Micrófono y Cámara
-            if let Ok(u) = request.clone().downcast::<webkit6::UserMediaPermissionRequest>() {
+            if let Ok(u) = request
+                .clone()
+                .downcast::<webkit6::UserMediaPermissionRequest>()
+            {
                 let is_audio = webkit6::functions::user_media_permission_is_for_audio_device(&u);
                 let is_video = webkit6::functions::user_media_permission_is_for_video_device(&u);
                 if has_site {
                     let mut allow = true;
-                    if is_audio && !perms.microphone { allow = false; }
-                    if is_video && !perms.camera { allow = false; }
-                    if allow { u.allow(); } else { u.deny(); }
+                    if is_audio && !perms.microphone {
+                        allow = false;
+                    }
+                    if is_video && !perms.camera {
+                        allow = false;
+                    }
+                    if allow {
+                        u.allow();
+                    } else {
+                        u.deny();
+                    }
                     return true;
                 }
                 if let Some(win) = window_weak.upgrade() {
                     let is_en = settings_perms.borrow().language == "en";
                     let (service_name, desc) = if is_audio && is_video {
                         (
-                            if is_en { "camera and microphone" } else { "la cámara y el micrófono" },
-                            if is_en { "access your camera and microphone" } else { "acceder a tu cámara web y micrófono" }
+                            if is_en {
+                                "camera and microphone"
+                            } else {
+                                "la cámara y el micrófono"
+                            },
+                            if is_en {
+                                "access your camera and microphone"
+                            } else {
+                                "acceder a tu cámara web y micrófono"
+                            },
                         )
                     } else if is_video {
                         (
                             if is_en { "camera" } else { "la cámara" },
-                            if is_en { "access your camera / webcam" } else { "acceder a tu cámara web" }
+                            if is_en {
+                                "access your camera / webcam"
+                            } else {
+                                "acceder a tu cámara web"
+                            },
                         )
                     } else {
                         (
                             if is_en { "microphone" } else { "el micrófono" },
-                            if is_en { "access your microphone" } else { "grabar audio o acceder al micrófono" }
+                            if is_en {
+                                "access your microphone"
+                            } else {
+                                "grabar audio o acceder al micrófono"
+                            },
                         )
                     };
                     let heading = if is_en {
@@ -232,10 +289,18 @@ impl BrowserTab {
                     dialog.connect_response(None, move |_, resp| {
                         let allow = resp == "allow";
                         let mut p = p_mgr.get_permissions(&h);
-                        if is_audio { p.microphone = allow; }
-                        if is_video { p.camera = allow; }
+                        if is_audio {
+                            p.microphone = allow;
+                        }
+                        if is_video {
+                            p.camera = allow;
+                        }
                         p_mgr.set_permissions(&h, p);
-                        if allow { req.allow(); } else { req.deny(); }
+                        if allow {
+                            req.allow();
+                        } else {
+                            req.deny();
+                        }
                     });
                     dialog.present(Some(&win));
                     return true;
@@ -245,7 +310,10 @@ impl BrowserTab {
             }
 
             // 4. Enumeración de dispositivos
-            if let Ok(d) = request.clone().downcast::<webkit6::DeviceInfoPermissionRequest>() {
+            if let Ok(d) = request
+                .clone()
+                .downcast::<webkit6::DeviceInfoPermissionRequest>()
+            {
                 if perms.camera || perms.microphone {
                     d.allow();
                 } else {
@@ -255,12 +323,73 @@ impl BrowserTab {
             }
 
             // 5. Almacenamiento y Cookies
-            if let Ok(w) = request.clone().downcast::<webkit6::WebsiteDataAccessPermissionRequest>() {
+            if let Ok(w) = request
+                .clone()
+                .downcast::<webkit6::WebsiteDataAccessPermissionRequest>()
+            {
                 if perms.storage {
                     w.allow();
                 } else {
                     w.deny();
                 }
+                return true;
+            }
+
+            // 6. Acceso al portapapeles
+            if let Ok(c) = request
+                .clone()
+                .downcast::<webkit6::ClipboardPermissionRequest>()
+            {
+                if has_site {
+                    if perms.clipboard {
+                        c.allow();
+                    } else {
+                        c.deny();
+                    }
+                    return true;
+                }
+                if let Some(win) = window_weak.upgrade() {
+                    let is_en = settings_perms.borrow().language == "en";
+                    let heading = if is_en {
+                        format!("Allow \"{}\" to access the clipboard?", host)
+                    } else {
+                        format!("¿Permitir a \"{}\" acceder al portapapeles?", host)
+                    };
+                    let body = if is_en {
+                        "This website would like to read from or write to your clipboard."
+                            .to_string()
+                    } else {
+                        "Este sitio web ha solicitado leer o escribir en tu portapapeles."
+                            .to_string()
+                    };
+                    let dialog = adw::AlertDialog::builder()
+                        .heading(&heading)
+                        .body(&body)
+                        .build();
+                    dialog.add_response("deny", if is_en { "Block" } else { "Bloquear" });
+                    dialog.set_response_appearance("deny", adw::ResponseAppearance::Destructive);
+                    dialog.add_response("allow", if is_en { "Allow" } else { "Permitir" });
+                    dialog.set_response_appearance("allow", adw::ResponseAppearance::Suggested);
+                    dialog.set_default_response(Some("allow"));
+
+                    let p_mgr = perms_mgr.clone();
+                    let h = host.clone();
+                    let req = c.clone();
+                    dialog.connect_response(None, move |_, resp| {
+                        let allow = resp == "allow";
+                        let mut p = p_mgr.get_permissions(&h);
+                        p.clipboard = allow;
+                        p_mgr.set_permissions(&h, p);
+                        if allow {
+                            req.allow();
+                        } else {
+                            req.deny();
+                        }
+                    });
+                    dialog.present(Some(&win));
+                    return true;
+                }
+                c.deny();
                 return true;
             }
 
@@ -273,7 +402,10 @@ impl BrowserTab {
         webview.connect_show_notification(move |_view, notif| {
             if let Some(win) = window_weak.upgrade() {
                 if let Some(app) = win.application() {
-                    let title = notif.title().map(|s| s.to_string()).unwrap_or_else(|| "Nika Browser".to_string());
+                    let title = notif
+                        .title()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "Nika Browser".to_string());
                     let gnotif = gio::Notification::new(&title);
                     if let Some(body) = notif.body() {
                         gnotif.set_body(Some(&body));
@@ -377,7 +509,11 @@ impl BrowserTab {
 
         let is_en = settings.borrow().language == "en";
         let initial_title = if is_incognito {
-            if is_en { "Private tab" } else { "Pestaña privada" }
+            if is_en {
+                "Private tab"
+            } else {
+                "Pestaña privada"
+            }
         } else {
             if is_en { "Home" } else { "Inicio" }
         };
@@ -391,7 +527,11 @@ impl BrowserTab {
         let mute_btn = gtk4::Button::from_icon_name("nika-volume-symbolic");
         mute_btn.add_css_class("tab-mute-btn");
         mute_btn.set_visible(false);
-        mute_btn.set_tooltip_text(Some(if is_en { "Mute tab" } else { "Silenciar pestaña" }));
+        mute_btn.set_tooltip_text(Some(if is_en {
+            "Mute tab"
+        } else {
+            "Silenciar pestaña"
+        }));
 
         mute_btn.connect_clicked(clone!(
             #[weak]
@@ -417,10 +557,18 @@ impl BrowserTab {
                     mute_btn.set_visible(true);
                     if muted {
                         mute_btn.set_icon_name("nika-volume-mute-symbolic");
-                        mute_btn.set_tooltip_text(Some(if is_en { "Unmute tab" } else { "Reactivar sonido" }));
+                        mute_btn.set_tooltip_text(Some(if is_en {
+                            "Unmute tab"
+                        } else {
+                            "Reactivar sonido"
+                        }));
                     } else {
                         mute_btn.set_icon_name("nika-volume-symbolic");
-                        mute_btn.set_tooltip_text(Some(if is_en { "Mute tab" } else { "Silenciar pestaña" }));
+                        mute_btn.set_tooltip_text(Some(if is_en {
+                            "Mute tab"
+                        } else {
+                            "Silenciar pestaña"
+                        }));
                     }
                 } else {
                     mute_btn.set_visible(false);
@@ -440,7 +588,11 @@ impl BrowserTab {
 
         let close_btn = gtk4::Button::from_icon_name("nika-close-symbolic");
         close_btn.add_css_class("tab-close-btn");
-        close_btn.set_tooltip_text(Some(if is_en { "Close tab" } else { "Cerrar pestaña" }));
+        close_btn.set_tooltip_text(Some(if is_en {
+            "Close tab"
+        } else {
+            "Cerrar pestaña"
+        }));
 
         let page = tab_view.append(&webview);
         page.set_title(initial_title);
@@ -525,6 +677,7 @@ impl BrowserTab {
             icon,
             move |view| {
                 if let Some(texture) = view.favicon() {
+icon.set_icon_name(None);
                     icon.set_paintable(Some(&texture));
                     if let Some(uri) = view.uri() {
                         if let Ok(u) = url::Url::parse(&uri) {
@@ -564,7 +717,11 @@ impl BrowserTab {
 
                 if is_home {
                     let t = if is_incognito {
-                        if is_en { "Private tab" } else { "Pestaña privada" }
+                        if is_en {
+                            "Private tab"
+                        } else {
+                            "Pestaña privada"
+                        }
                     } else {
                         if is_en { "Home" } else { "Inicio" }
                     };
@@ -600,7 +757,10 @@ impl BrowserTab {
                 if let Some(uri) = view.uri() {
                     *current_url.borrow_mut() = uri.to_string();
                     if tab_view.selected_page() == Some(page.clone()) {
-                        if !uri.starts_with("file://") && uri != "http://localhost/" && uri != "nika://home" {
+                        if !uri.starts_with("file://")
+                            && uri != "http://localhost/"
+                            && uri != "nika://home"
+                        {
                             omnibox.set_text(&uri);
                         } else {
                             omnibox.set_text("");
@@ -849,10 +1009,18 @@ impl BrowserTab {
             self.mute_btn.set_visible(true);
             if muted {
                 self.mute_btn.set_icon_name("nika-volume-mute-symbolic");
-                self.mute_btn.set_tooltip_text(Some(if is_en { "Unmute tab" } else { "Reactivar sonido" }));
+                self.mute_btn.set_tooltip_text(Some(if is_en {
+                    "Unmute tab"
+                } else {
+                    "Reactivar sonido"
+                }));
             } else {
                 self.mute_btn.set_icon_name("nika-volume-symbolic");
-                self.mute_btn.set_tooltip_text(Some(if is_en { "Mute tab" } else { "Silenciar pestaña" }));
+                self.mute_btn.set_tooltip_text(Some(if is_en {
+                    "Mute tab"
+                } else {
+                    "Silenciar pestaña"
+                }));
             }
         } else {
             self.mute_btn.set_visible(false);
@@ -895,7 +1063,8 @@ impl BrowserTab {
         if trimmed == "nika://settings" || trimmed.starts_with("nika://settings#") {
             *self.current_url.borrow_mut() = trimmed.to_string();
             let is_en = self.settings.borrow().language == "en";
-            self.title_label.set_text(if is_en { "Settings" } else { "Configuración" });
+            self.title_label
+                .set_text(if is_en { "Settings" } else { "Configuración" });
             self.icon.set_icon_name(Some("nika-settings-symbolic"));
 
             let current_json = serde_json::to_string(&*self.settings.borrow()).unwrap_or_default();
@@ -906,10 +1075,12 @@ impl BrowserTab {
                 "is_configured": is_cfg,
                 "is_unlocked": is_unlocked,
                 "entries_count": count
-            }).to_string();
+            })
+            .to_string();
 
             let saved_passwords_json = if is_unlocked {
-                serde_json::to_string(&self.password_vault.list_entries().unwrap_or_default()).unwrap_or_else(|_| "[]".to_string())
+                serde_json::to_string(&self.password_vault.list_entries().unwrap_or_default())
+                    .unwrap_or_else(|_| "[]".to_string())
             } else {
                 "[]".to_string()
             };
@@ -939,7 +1110,8 @@ impl BrowserTab {
         } else if trimmed == "nika://welcome" {
             *self.current_url.borrow_mut() = "nika://welcome".to_string();
             let is_en = self.settings.borrow().language == "en";
-            self.title_label.set_text(if is_en { "Welcome" } else { "Bienvenida" });
+            self.title_label
+                .set_text(if is_en { "Welcome" } else { "Bienvenida" });
             self.icon.set_icon_name(Some("nika-shield-symbolic"));
             let current_json = serde_json::to_string(&*self.settings.borrow()).unwrap_or_default();
             let html = WELCOME_HTML.replace(
@@ -947,17 +1119,29 @@ impl BrowserTab {
                 &format!("window.__NIKA_SETTINGS = {};", current_json),
             );
             self.webview.load_html(&html, Some("nika://welcome"));
-        } else if trimmed == "nika://home" || trimmed.starts_with("file://") || trimmed == "about:blank" || trimmed.is_empty() {
+        } else if trimmed == "nika://home"
+            || trimmed.starts_with("file://")
+            || trimmed == "about:blank"
+            || trimmed.is_empty()
+        {
             *self.current_url.borrow_mut() = "nika://home".to_string();
             let is_en = self.settings.borrow().language == "en";
             let t = if self.is_incognito {
-                if is_en { "Private tab" } else { "Pestaña privada" }
+                if is_en {
+                    "Private tab"
+                } else {
+                    "Pestaña privada"
+                }
             } else {
                 if is_en { "Home" } else { "Inicio" }
             };
             self.title_label.set_text(t);
             self.page.set_title(t);
-            self.icon.set_icon_name(Some(if self.is_incognito { "nika-incognito-symbolic" } else { "nika-home-symbolic" }));
+            self.icon.set_icon_name(Some(if self.is_incognito {
+                "nika-incognito-symbolic"
+            } else {
+                "nika-home-symbolic"
+            }));
             let current_json = serde_json::to_string(&*self.settings.borrow()).unwrap_or_default();
             let html = HOME_HTML.replace(
                 "/* __INITIAL_SETTINGS__ */",
@@ -965,13 +1149,19 @@ impl BrowserTab {
             );
             self.webview.load_html(&html, Some("nika://home"));
         } else {
-            if !trimmed.contains(".translate.goog") && !trimmed.starts_with("https://translate.google.com/translate") {
+            if !trimmed.contains(".translate.goog")
+                && !trimmed.starts_with("https://translate.google.com/translate")
+            {
                 *self.is_translated.borrow_mut() = false;
                 *self.original_url.borrow_mut() = None;
             } else {
                 *self.is_translated.borrow_mut() = true;
             }
-            self.icon.set_icon_name(Some(if self.is_incognito { "nika-incognito-symbolic" } else { "web-browser-symbolic" }));
+            self.icon.set_icon_name(Some(if self.is_incognito {
+                "nika-incognito-symbolic"
+            } else {
+                "web-browser-symbolic"
+            }));
             FaviconManager::load_for_url(trimmed, &self.icon);
             let cleaned = PrivacyEngine::clean_url(trimmed);
             *self.current_url.borrow_mut() = cleaned.clone();
@@ -988,7 +1178,8 @@ impl BrowserTab {
             } else {
                 "if (document.body) { document.body.classList.remove('dark'); }"
             };
-            self.webview.evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
+            self.webview
+                .evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});
         }
     }
 

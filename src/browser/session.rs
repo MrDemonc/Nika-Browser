@@ -17,26 +17,24 @@ pub fn save_session_data(tabs: &Rc<RefCell<Vec<BrowserTab>>>, tab_view: &adw::Ta
     let mut active_index = 0;
     let selected_page = tab_view.selected_page();
 
-    for (idx, tab) in tabs_b.iter().filter(|t| !t.is_incognito).enumerate() {
+    for tab in tabs_b.iter().filter(|t| !t.is_incognito) {
         let url = tab.current_url.borrow().clone();
-        if !url.is_empty() {
-            urls.push(url);
+        if url.is_empty() {
+            continue;
         }
-        if let Some(ref sel) = selected_page {
-            if tab.page == *sel {
-                active_index = idx;
-            }
+        if let Some(ref sel) = selected_page
+            && tab.page == *sel
+        {
+            active_index = urls.len();
         }
+        urls.push(url);
     }
 
     if urls.is_empty() {
         urls.push("nika://home".to_string());
     }
 
-    let state = SessionState {
-        urls,
-        active_index,
-    };
+    let state = SessionState { urls, active_index };
 
     let dir = glib::user_config_dir().join("nika-browser");
     let _ = std::fs::create_dir_all(&dir);

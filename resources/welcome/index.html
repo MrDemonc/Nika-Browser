@@ -775,8 +775,8 @@
         master_password: finalPass
       };
 
-      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nikaCompleteOnboarding) {
-        window.webkit.messageHandlers.nikaCompleteOnboarding.postMessage(JSON.stringify(payload));
+      if (window.nikaSend) {
+        window.nikaSend("nikaCompleteOnboarding", JSON.stringify(payload));
       }
     }
 

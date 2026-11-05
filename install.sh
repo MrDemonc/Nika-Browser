@@ -105,6 +105,25 @@ echo -e "${CYAN}🖼️  Installing official desktop icon...${NC}"
 curl -fsSL "$ICON_URL" -o "$TARGET_ICON" 2>/dev/null || true
 echo -e "${GREEN}✓ Icon installed to: ${TARGET_ICON}${NC}"
 
+# 7b. Install bundled resources (icons, styles, privacy filter rules)
+RESOURCES_DIR="${HOME}/.local/share/nika-browser/resources"
+echo -e "${CYAN}📦 Installing resources (icons, styles, privacy rules)...${NC}"
+RES_TMP="$(mktemp -d)"
+if curl -fsSL "https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz" -o "${RES_TMP}/src.tar.gz" 2>/dev/null \
+    && tar -xzf "${RES_TMP}/src.tar.gz" -C "$RES_TMP" 2>/dev/null; then
+    SRC_ROOT="$(find "$RES_TMP" -maxdepth 1 -mindepth 1 -type d -name 'Nika-Browser-*' | head -n1)"
+    if [ -n "$SRC_ROOT" ] && [ -d "${SRC_ROOT}/resources" ]; then
+        mkdir -p "$RESOURCES_DIR"
+        cp -R "${SRC_ROOT}/resources/." "$RESOURCES_DIR/"
+        echo -e "${GREEN}✓ Resources installed to: ${RESOURCES_DIR}${NC}"
+    else
+        echo -e "${YELLOW}⚠️ Could not locate resources in the release archive; using built-in defaults.${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️ Could not download resource bundle; using built-in defaults.${NC}"
+fi
+rm -rf "$RES_TMP"
+
 # 8. Create desktop launcher entry (.desktop file)
 DESKTOP_FILE="${APPS_DIR}/nika-browser.desktop"
 echo -e "${CYAN}🖥️  Configuring desktop application launcher...${NC}"
