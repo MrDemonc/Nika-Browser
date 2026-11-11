@@ -94,101 +94,150 @@ progressbar.pastel-progress > trough {
   padding: 0;
 }
 
-/* Botones de navegación pequeños, compactos, modernos y refinados */
+/* Botones de navegación pequeños, compactos, modernos y refinados con micro-animaciones */
 .nav-button {
   background: transparent;
   color: #c0c0c0;
-  border-radius: 5px;
-  min-width: 24px;
-  min-height: 24px;
+  border-radius: 7px;
+  min-width: 26px;
+  min-height: 26px;
   padding: 0;
   margin: 0 1px;
   border: 1px solid transparent;
-  transition: all 140ms ease;
+  transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
   -gtk-icon-size: 13px;
 }
 
 .nav-button:hover {
-  background-color: #202020;
-  border-color: #303030;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
   color: #ffffff;
+  transform: scale(1.08);
 }
 
 .nav-button:active {
-  background-color: #282828;
+  background-color: rgba(255, 255, 255, 0.14);
+  transform: scale(0.92);
 }
 
-/* Controles multimedia compactos en la barra superior (a la derecha de Inicio) */
+/* Controles multimedia refinados, modernos y animados (cápsula flotante) */
 .header-media-box {
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 1px 2px;
-  margin-left: 5px;
-  margin-right: 3px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  padding: 2px 5px;
+  margin-left: 6px;
+  margin-right: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+  transition: all 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .dark-theme .header-media-box {
-  background-color: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
 }
 
 .header-media-btn {
-  min-width: 22px;
-  min-height: 22px;
+  min-width: 26px;
+  min-height: 26px;
+  border-radius: 50%;
   padding: 0;
-  margin: 0;
-  -gtk-icon-size: 12px;
+  margin: 0 1px;
+  -gtk-icon-size: 13px;
+  color: #c4c4c4;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.header-media-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transform: scale(1.12);
+}
+
+.header-media-btn:active {
+  transform: scale(0.92);
+}
+
+/* Botón central de Reproducción / Pausa: diseño destacado, vibrante, moderno y reactivo */
 .header-media-play-btn {
-  color: #48dbfb;
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: 50%;
+  background-color: #38d9a9;
+  background-image: linear-gradient(135deg, #00d2d3 0%, #1dd1a1 100%);
+  color: #031410;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 2px 10px rgba(0, 210, 211, 0.45);
+  transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  -gtk-icon-size: 14px;
+  margin: 0 3px;
 }
 
 .header-media-play-btn:hover {
-  color: #0abde3;
-  background-color: rgba(72, 219, 251, 0.15);
+  background-color: #20bf6b;
+  background-image: linear-gradient(135deg, #48dbfb 0%, #10ac84 100%);
+  color: #000000;
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 16px rgba(72, 219, 251, 0.75), 0 3px 12px rgba(0, 210, 211, 0.5);
+  transform: scale(1.15);
+}
+
+.header-media-play-btn:active {
+  transform: scale(0.90);
+  box-shadow: 0 1px 4px rgba(0, 210, 211, 0.5);
 }
 
 .dark-theme .header-media-play-btn {
-  color: #48dbfb;
+  background-color: #38d9a9;
+  background-image: linear-gradient(135deg, #00d2d3 0%, #1dd1a1 100%);
+  color: #031410;
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 12px rgba(0, 210, 211, 0.4);
 }
 
 .dark-theme .header-media-play-btn:hover {
-  color: #0abde3;
-  background-color: rgba(72, 219, 251, 0.18);
+  background-color: #20bf6b;
+  background-image: linear-gradient(135deg, #48dbfb 0%, #10ac84 100%);
+  color: #000000;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 18px rgba(72, 219, 251, 0.8), 0 3px 14px rgba(0, 210, 211, 0.55);
 }
 
-/* Barra de direcciones / Omnibox compacta horizontalmente */
+/* Barra de direcciones / Omnibox compacta con animación suave al enfocar */
 entry.omnibox {
   background-color: var(--nika-entry-bg);
   color: var(--nika-text);
   border: 1px solid var(--nika-border);
-  border-radius: 12px;
-  padding: 1px 12px;
+  border-radius: 14px;
+  padding: 2px 14px;
   font-size: 11.5px;
-  min-height: 24px;
-  min-width: 280px;
-  transition: all 160ms ease;
+  min-height: 26px;
+  min-width: 290px;
+  transition: all 240ms cubic-bezier(0.16, 1, 0.3, 1);
   -gtk-icon-size: 12px;
 }
 
 entry.omnibox:focus {
-  border-color: var(--nika-accent);
-  box-shadow: 0 0 0 1.5px rgba(158, 149, 135, 0.25);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.08);
+  transform: scale(1.008);
 }
 
 /* Botón del Escudo de Privacidad compacto */
 .shield-pill {
   background-color: #141414;
   color: #10ac84;
-  border-radius: 5px;
-  min-width: 24px;
-  min-height: 24px;
+  border-radius: 6px;
+  min-width: 26px;
+  min-height: 26px;
   padding: 0;
   margin: 0 1px;
   border: 1px solid #242424;
-  transition: all 140ms ease;
+  transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
   -gtk-icon-size: 13px;
 }
 
@@ -202,6 +251,11 @@ entry.omnibox:focus {
   background-color: #1e1e1e;
   border-color: #333333;
   color: #1dd1a1;
+  transform: scale(1.08);
+}
+
+.shield-pill:active {
+  transform: scale(0.94);
 }
 
 /* Botón de Permisos del Sitio en Header */
@@ -408,65 +462,82 @@ dialog.permissions-dialog > contents,
   min-height: 28px;
 }
 
-/* Píldora de cada pestaña */
+/* Píldora de cada pestaña con micro-animaciones fluidas */
 .tab-pill {
   background-color: var(--nika-tab-pill-bg);
   color: var(--nika-text-muted);
   border-radius: 10px;
-  padding: 2px 8px;
+  padding: 3px 9px;
   margin: 0 2px;
   border: 1px solid var(--nika-border);
-  transition: all 140ms ease;
+  transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tab-pill:hover {
   background-color: var(--nika-tab-pill-active);
   color: var(--nika-text);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
-/* Pestaña activa con acento pastel */
+.tab-pill:active {
+  transform: scale(0.98);
+}
+
+/* Pestaña activa con acento pastel y sutil sombra */
 .tab-pill.active {
   background-color: var(--nika-tab-pill-active);
   color: var(--nika-text);
-  border: 1px solid var(--nika-accent);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* Iconos y textos dentro de la pestaña */
 .tab-icon {
-  opacity: 0.7;
+  opacity: 0.9;
+  transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tab-pill:hover .tab-icon {
+  opacity: 1;
 }
 
 .tab-spinner {
-  min-width: 13px;
-  min-height: 13px;
+  min-width: 14px;
+  min-height: 14px;
 }
 
 .tab-title {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 500;
+  transition: color 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Botón cerrar pestaña (×) limpio y minimalista sin círculos */
+/* Botón cerrar pestaña (×) limpio, animado y minimalista */
 .tab-close-btn {
   background: transparent;
   color: var(--nika-text-muted);
   border: none;
-  min-width: 14px;
-  min-height: 14px;
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: 50%;
   padding: 1px;
   margin-left: 3px;
-  transition: all 120ms ease;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tab-close-btn image {
   color: var(--nika-text-muted);
   opacity: 0.75;
   -gtk-icon-size: 10px;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tab-close-btn:hover {
-  background: transparent;
+  background: rgba(255, 71, 87, 0.18);
   color: #ff4757;
+  transform: scale(1.15);
 }
 
 .tab-close-btn:hover image {
@@ -474,32 +545,37 @@ dialog.permissions-dialog > contents,
   opacity: 1;
 }
 
+.tab-close-btn:active {
+  transform: scale(0.9);
+}
+
 /* Botón silenciar pestaña (🔊/🔇) */
 .tab-mute-btn {
   background: transparent;
   color: #48dbfb;
   border: none;
-  min-width: 14px;
-  min-height: 14px;
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: 50%;
   padding: 1px;
   margin-right: 2px;
-  transition: all 120ms ease;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tab-mute-btn image {
   color: #48dbfb;
   opacity: 0.9;
   -gtk-icon-size: 11px;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tab-mute-btn:hover {
-  background: rgba(72, 219, 251, 0.15);
-  border-radius: 4px;
+  background: rgba(72, 219, 251, 0.2);
+  transform: scale(1.12);
 }
 
-.tab-mute-btn:hover image {
-  color: #0abde3;
-  opacity: 1;
+.tab-mute-btn:active {
+  transform: scale(0.92);
 }
 
 /* Botón nueva pestaña (+) */
@@ -534,9 +610,10 @@ progressbar.pastel-progress > trough {
 }
 
 progressbar.pastel-progress > trough > progress {
-  background: linear-gradient(90deg, var(--pastel-lavender), var(--pastel-mint), var(--pastel-sky));
-  border-radius: 1px;
-  min-height: 3px;
+  background: linear-gradient(90deg, #00d2d3, #48dbfb, #1dd1a1);
+  border-radius: 2px;
+  min-height: 2.5px;
+  transition: width 240ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ====================================================================
@@ -548,27 +625,61 @@ progressbar.pastel-progress > trough > progress {
   background-color: var(--pastel-lavender);
 }
 
-.tab-menu-popover {
-  background-color: var(--nika-entry-bg);
-  border: 1px solid var(--nika-border);
+popover.tab-menu-popover > contents,
+popover.folder-menu-popover > contents {
+  background-color: #181818;
+  border: 1px solid #333333;
   border-radius: 10px;
-  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: 6px;
+}
+
+popover.tab-menu-popover > arrow,
+popover.folder-menu-popover > arrow {
+  background-color: transparent;
+  border: none;
+}
+
+.tab-menu-popover,
+.folder-menu-popover {
+  background-color: transparent;
+  border: none;
+  padding: 0;
 }
 
 .tab-menu-btn {
   background: transparent;
-  color: var(--nika-text);
+  color: #dddddd;
   border-radius: 6px;
-  padding: 5px 10px;
-  font-size: 11px;
+  padding: 6px 10px;
+  font-size: 11.5px;
   border: none;
-  min-height: 24px;
+  min-height: 26px;
   transition: all 120ms ease;
 }
 
 .tab-menu-btn:hover {
-  background-color: var(--nika-tab-pill-bg);
-  color: var(--nika-accent);
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.tab-menu-btn-primary {
+  color: #00d2d3;
+  font-weight: 600;
+}
+
+.tab-menu-btn-primary:hover {
+  background-color: rgba(0, 210, 211, 0.15);
+  color: #00d2d3;
+}
+
+.tab-menu-btn-danger {
+  color: #ff7675;
+}
+
+.tab-menu-btn-danger:hover {
+  background-color: rgba(255, 118, 117, 0.15);
+  color: #ff7675;
 }
 
 /* ====================================================================
@@ -648,34 +759,6 @@ progressbar.pastel-progress > trough > progress {
 
 .dark-theme .tab-close-btn:hover image {
   color: #ff4757;
-  opacity: 1;
-}
-
-/* Botón silenciar pestaña (🔊/🔇) */
-.tab-mute-btn {
-  background: transparent;
-  color: #48dbfb;
-  border: none;
-  min-width: 14px;
-  min-height: 14px;
-  padding: 1px;
-  margin-right: 2px;
-  transition: all 120ms ease;
-}
-
-.tab-mute-btn image {
-  color: #48dbfb;
-  opacity: 0.9;
-  -gtk-icon-size: 11px;
-}
-
-.tab-mute-btn:hover {
-  background: rgba(72, 219, 251, 0.15);
-  border-radius: 4px;
-}
-
-.tab-mute-btn:hover image {
-  color: #0abde3;
   opacity: 1;
 }
 
@@ -775,7 +858,8 @@ windowcontrols button.close:active image {
 }
 
 .dark-theme progressbar.pastel-progress > trough > progress {
-  background: linear-gradient(90deg, #444444, #888888, #cccccc);
+  background: linear-gradient(90deg, #00d2d3, #48dbfb, #1dd1a1);
+  transition: width 240ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ====================================================================
@@ -886,43 +970,450 @@ box.floating-sidebar {
   background-color: var(--nika-tab-pill-bg);
   color: var(--nika-text-muted);
   border-radius: 8px;
-  padding: 4px 6px;
+  padding: 4px 8px;
   margin: 1px 0;
   border: 1px solid var(--nika-border);
-  min-height: 26px;
-  transition: all 120ms ease;
+  min-height: 28px;
+  transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .vertical-tabs-box .tab-pill:hover {
   background-color: var(--nika-tab-pill-active);
   color: var(--nika-text);
-  border-color: var(--nika-accent);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateX(2px);
+}
+
+.vertical-tabs-box .tab-pill:active {
+  transform: scale(0.98);
 }
 
 .vertical-tabs-box .tab-pill.active {
   background-color: var(--nika-tab-pill-active);
   color: var(--nika-text);
-  border: 1.5px solid var(--nika-accent);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .dark-theme .vertical-tabs-box .tab-pill {
-  background-color: #181818;
-  color: #8a8a8a;
-  border: 1px solid #242424;
+  background-color: transparent;
+  color: #a0a0a0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: 1px 0;
+  transition: all 140ms ease;
 }
 
 .dark-theme .vertical-tabs-box .tab-pill:hover {
-  background-color: #202020;
-  color: #f0f0f0;
-  border-color: #383838;
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  border-color: transparent;
 }
 
 .dark-theme .vertical-tabs-box .tab-pill.active {
-  background-color: #242424;
+  background-color: #ffffff;
+  color: #121214;
+  font-weight: 600;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.dark-theme .vertical-tabs-box .tab-pill.active .tab-title {
+  color: #121214;
+  font-weight: 600;
+}
+
+.dark-theme .vertical-tabs-box .tab-pill.active .tab-icon {
+  color: #121214;
+}
+
+.dark-theme .vertical-tabs-box .tab-pill.active .tab-close-btn {
+  color: #555558;
+}
+
+.dark-theme .vertical-tabs-box .tab-pill.active .tab-close-btn:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+  color: #111111;
+}
+
+.dark-theme .vertical-tabs-box .tab-pill.active .tab-mute-btn {
+  color: #555558;
+}
+
+/* ====================================================================
+   Sección de Carpetas de Pestañas (Al principio de la barra vertical)
+   ==================================================================== */
+.tab-folders-section {
+  margin-bottom: 4px;
+  padding-bottom: 2px;
+}
+
+.folders-section-header {
+  padding: 3px 6px;
+  border-radius: 7px;
+  color: var(--nika-text-muted);
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.folders-section-header:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.folders-toggle-chevron {
+  -gtk-icon-size: 11px;
+  color: #888888;
+  margin-right: 4px;
+  transition: all 180ms ease;
+}
+
+.folders-header-icon {
+  -gtk-icon-size: 13px;
+  color: #00d2d3;
+  margin-right: 4px;
+}
+
+.folders-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #9e9e9e;
+}
+
+.folders-divider {
+  background-color: var(--nika-border);
+  min-height: 1px;
+  margin: 5px 2px 4px 2px;
+  opacity: 0.5;
+}
+
+/* Banner cuando no hay carpetas */
+.folders-empty-banner {
+  background: rgba(255, 255, 255, 0.03);
+  color: #888888;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  font-size: 11px;
+  padding: 6px 8px;
+  margin: 2px 0;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.folders-empty-banner:hover {
+  background: rgba(0, 210, 211, 0.08);
+  border-color: rgba(0, 210, 211, 0.35);
+  color: #00d2d3;
+  transform: translateY(-1px);
+}
+
+/* Tarjeta de cada carpeta - diseño transparente y limpio sin recuadros pesados */
+.tab-folder-card {
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0;
+  margin: 1px 0;
+  transition: all 180ms ease;
+}
+
+.tab-folder-card:hover {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.dark-theme .tab-folder-card {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.dark-theme .tab-folder-card:hover {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* Estado al arrastrar una pestaña sobre la carpeta */
+.tab-folder-card.tab-folder-drop-hover {
+  border: 1.5px solid #00d2d3;
+  background-color: rgba(0, 210, 211, 0.15);
+  box-shadow: 0 0 14px rgba(0, 210, 211, 0.45);
+  transform: scale(1.02);
+}
+
+/* Fila de cabecera de la carpeta */
+.tab-folder-header {
+  padding: 4px 6px;
+  border-radius: 7px;
+  transition: background-color 160ms ease;
+}
+
+.tab-folder-header:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.tab-folder-chevron {
+  -gtk-icon-size: 11px;
+  color: #888888;
+  margin-right: 4px;
+}
+
+.tab-folder-icon {
+  -gtk-icon-size: 13px;
+  margin-right: 5px;
+  opacity: 0.95;
+}
+
+/* Colores pastel aplicados DIRECTAMENTE al icono de la carpeta */
+.tab-folder-icon.color-dot-00d2d3 { color: #00d2d3; }
+.tab-folder-icon.color-dot-1dd1a1 { color: #1dd1a1; }
+.tab-folder-icon.color-dot-a29bfe { color: #a29bfe; }
+.tab-folder-icon.color-dot-fd79a8 { color: #fd79a8; }
+.tab-folder-icon.color-dot-ff7675 { color: #ff7675; }
+.tab-folder-icon.color-dot-ffeaa7 { color: #ffeaa7; }
+
+.tab-folder-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--nika-text);
+}
+
+.tab-folder-count {
+  font-size: 10px;
+  font-weight: 600;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #b0b0b0;
+  border-radius: 10px;
+  padding: 1px 6px;
+  margin-left: 4px;
+}
+
+/* Lista de pestañas dentro de la carpeta */
+.tab-folder-tabs-box {
+  padding: 3px 2px 4px 6px;
+  border-left: 1.5px solid rgba(255, 255, 255, 0.12);
+  margin-left: 12px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+/* Botón principal "+ Guardar pestaña activa" situado al principio */
+.folder-add-active-top-btn {
+  background: rgba(0, 210, 211, 0.08);
+  border: 1px dashed rgba(0, 210, 211, 0.35);
+  color: #00d2d3;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin: 1px 0 4px 0;
+  transition: all 180ms ease;
+}
+
+.folder-add-active-top-btn:hover {
+  background: rgba(0, 210, 211, 0.2);
+  border-color: #00d2d3;
   color: #ffffff;
-  border: 1.5px solid #4a4a4a;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.folder-tab-row {
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 3px 6px;
+  margin: 1px 0;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.folder-tab-row:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateX(2px);
+}
+
+.folder-tab-icon {
+  -gtk-icon-size: 11px;
+  opacity: 0.85;
+  margin-right: 4px;
+}
+
+.folder-tab-title {
+  font-size: 11px;
+  color: #c0c0c0;
+}
+
+.folder-tab-row:hover .folder-tab-title {
+  color: #ffffff;
+}
+
+.folder-tab-remove-btn {
+  background: transparent;
+  color: #777777;
+  border: none;
+  min-width: 14px;
+  min-height: 14px;
+  border-radius: 50%;
+  padding: 0;
+  margin-left: 2px;
+  -gtk-icon-size: 9px;
+  opacity: 0;
+  transition: all 160ms ease;
+}
+
+.folder-tab-row:hover .folder-tab-remove-btn {
+  opacity: 1;
+}
+
+.folder-tab-remove-btn:hover {
+  color: #ff4757;
+  background-color: rgba(255, 71, 87, 0.18);
+}
+
+/* ====================================================================
+   Popovers Rediseñados de Carpetas (Diseño idéntico a Traducción, sin flecha)
+   ==================================================================== */
+popover.folder-dialog-popover > contents {
+  background-color: #181818;
+  border: 1px solid #333333;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: 10px 12px;
+  min-width: 220px;
+}
+
+.dark-theme popover.folder-dialog-popover > contents {
+  background-color: #181818;
+  border-color: #333333;
+}
+
+popover.folder-dialog-popover > arrow {
+  background-color: transparent;
+  border: none;
+}
+
+.folder-dialog-popover {
+  background-color: transparent;
+  border: none;
+}
+
+.folder-popover-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.folder-name-entry {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  transition: all 180ms ease;
+}
+
+.folder-name-entry:focus {
+  border-color: #00d2d3;
+  box-shadow: 0 0 10px rgba(0, 210, 211, 0.28);
+}
+
+.folder-color-section-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.color-picker-dot {
+  min-width: 20px;
+  min-height: 20px;
+  border-radius: 50%;
+  margin: 1px 3px;
+  border: 2px solid transparent;
+  padding: 0;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.color-picker-dot:hover {
+  transform: scale(1.22);
+}
+
+.color-picker-dot.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.65);
+  transform: scale(1.14);
+}
+
+.folder-dialog-btn-cancel {
+  background: transparent;
+  color: #94a3b8;
+  border: none;
+  border-radius: 7px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  transition: all 160ms ease;
+}
+
+.folder-dialog-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.folder-dialog-btn-create {
+  background: linear-gradient(135deg, #00d2d3 0%, #1dd1a1 100%);
+  color: #031410;
+  font-weight: 600;
+  border: none;
+  border-radius: 7px;
+  padding: 5px 14px;
+  font-size: 11.5px;
+  box-shadow: 0 2px 8px rgba(0, 210, 211, 0.3);
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.folder-dialog-btn-create:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 12px rgba(72, 219, 251, 0.6);
+  color: #000000;
+}
+
+/* Clases de colores pastel */
+.color-dot-00d2d3 { background-color: #00d2d3; }
+.color-dot-1dd1a1 { background-color: #1dd1a1; }
+.color-dot-a29bfe { background-color: #a29bfe; }
+.color-dot-fd79a8 { background-color: #fd79a8; }
+.color-dot-ff7675 { background-color: #ff7675; }
+.color-dot-ffeaa7 { background-color: #ffeaa7; }
+
+.tab-menu-section-header {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #888888;
+  margin-top: 4px;
+  margin-bottom: 2px;
+  padding-left: 4px;
+}
+
+.tab-menu-btn-primary {
+  color: #00d2d3;
+  font-weight: 600;
+}
+
+.tab-menu-btn-primary:hover {
+  background-color: rgba(0, 210, 211, 0.15);
+  color: #00d2d3;
+}
+
+.tab-menu-btn-danger {
+  color: #ff4757;
+}
+
+.tab-menu-btn-danger:hover {
+  background-color: rgba(255, 71, 87, 0.18);
+  color: #ff4757;
 }
 
 /* ====================================================================
@@ -937,19 +1428,23 @@ box.floating-sidebar {
   padding: 0 4px;
   margin: 0 1px;
   border: 1px solid transparent;
-  transition: all 140ms ease;
-  -gtk-icon-size: 14px;
+  transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .download-btn:hover {
-  background-color: #222222;
-  border-color: #333333;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
   color: #ffffff;
+  transform: scale(1.08);
 }
 
 .dark-theme .download-btn:hover {
   background-color: #222222;
   border-color: #333333;
+}
+
+.download-btn:active {
+  transform: scale(0.92);
 }
 
 /* Estado activo estable: iluminado continuo sin pulsación */
@@ -1409,7 +1904,7 @@ popover.translation-popover > arrow {
 }
 
 
-.translation-dropdown { min-width: 130px; width: 130px; }
+.translation-dropdown { min-width: 130px; }
 /* ====================================================================
    Ranura y animación de arrastre de pestañas (Drag & Drop Gap Slot)
    ==================================================================== */
@@ -1556,4 +2051,168 @@ popover.translation-popover > arrow {
 .media-play-btn:active {
   transform: scale(0.93);
 }
+
+/* ====================================================================
+   Diseño Estilo Arc Browser (Barra lateral integrada + Canvas redondeado)
+   ==================================================================== */
+.arc-sidebar-top {
+  padding: 6px 6px 4px 6px;
+  background-color: transparent;
+}
+
+.arc-sidebar-nav-row {
+  padding: 2px 0 4px 0;
+}
+
+.arc-toggle-btn {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 4px;
+  border-radius: 6px;
+  color: #a0a0a0;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 120ms ease;
+}
+
+.arc-toggle-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.arc-nav-btn {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 4px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #a0a0a0;
+  transition: all 120ms ease;
+}
+
+.arc-nav-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+/* Cápsula de URL / Omnibox en el panel lateral estilo Arc */
+.arc-sidebar-omnibox {
+  border-radius: 10px;
+  padding: 3px 10px;
+  min-height: 28px;
+  font-size: 11px;
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 160ms ease;
+  margin-top: 2px;
+}
+
+.arc-sidebar-omnibox:focus {
+  border-color: #48dbfb;
+  background-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 1.5px rgba(72, 219, 251, 0.35);
+}
+
+.dark-theme .arc-sidebar-omnibox {
+  background-color: #1a1a1e;
+  border-color: #2b2b32;
+  color: #e4e4e7;
+}
+
+.dark-theme .arc-sidebar-omnibox:focus {
+  border-color: #48dbfb;
+  background-color: #202026;
+  box-shadow: 0 0 0 1.5px rgba(72, 219, 251, 0.35);
+}
+
+/* Botón sutil de nueva pestaña estilo Arc */
+.arc-new-tab-btn {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #8c8c93;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 8px;
+  margin: 2px 0 4px 0;
+  border-radius: 6px;
+  transition: all 120ms ease;
+}
+
+.arc-new-tab-btn:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+/* Barra inferior de herramientas al pie de la barra lateral */
+.arc-sidebar-footer {
+  padding: 6px 6px 6px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  background-color: transparent;
+  margin-top: 2px;
+}
+
+.arc-tool-btn {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 3px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #8c8c93;
+  transition: all 120ms ease;
+}
+
+.arc-tool-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.arc-media-box {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 1px 2px;
+}
+
+/* Canvas de página web con marco redondeado estilo Arc */
+.nika-overlay {
+  border-radius: 12px;
+  background-color: #ffffff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  margin: 4px 6px 6px 0;
+}
+
+.dark-theme .nika-overlay {
+  border-radius: 12px;
+  background-color: #121216;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  margin: 4px 6px 6px 0;
+}
+
+/* Dimensiones compactas para el panel lateral estilo Arc (210px) */
+.docked-sidebar,
+.floating-sidebar {
+  min-width: 210px;
+}
+
+.sidebar-header {
+  padding: 4px 6px 4px 6px;
+  margin-bottom: 2px;
+}
+
+/* Checkbutton en el menú contextual de clic derecho */
+.sidebar-check-opt {
+  font-size: 11.5px;
+  color: #dddddd;
+  padding: 3px 6px;
+}
+
+.sidebar-check-opt:hover {
+  color: #ffffff;
+}
+
 

@@ -35,9 +35,16 @@ pub struct BrowserTab {
     pub is_translated: Rc<RefCell<bool>>,
     pub original_url: Rc<RefCell<Option<String>>>,
     pub mute_btn: gtk4::Button,
+    pub pending_lazy_url: Rc<RefCell<Option<String>>>,
 }
 
 impl BrowserTab {
+    pub fn ensure_loaded(&self) {
+        if let Some(url) = self.pending_lazy_url.borrow_mut().take() {
+            self.load_uri(&url);
+        }
+    }
+
     pub fn new(
         tab_view: &adw::TabView,
         home_url: &str,
@@ -45,7 +52,7 @@ impl BrowserTab {
         omnibox: &gtk4::Entry,
         reload_btn: &gtk4::Button,
         window: &adw::ApplicationWindow,
-        header_bar: &adw::HeaderBar,
+        header_bar: &gtk4::Box,
         sidebar: &gtk4::Revealer,
         content_manager: &UserContentManager,
         download_manager: &Rc<DownloadManager>,
@@ -54,8 +61,11 @@ impl BrowserTab {
         persistent_session: &webkit6::NetworkSession,
         find_count_label: &gtk4::Label,
         permissions_manager: &crate::browser::permissions::SitePermissionsManager,
+        tab_opener: &Rc<RefCell<Option<Rc<dyn Fn(&str, bool, Option<&WebView>) -> BrowserTab>>>>,
         is_dark: bool,
         is_incognito: bool,
+        related_view: Option<&WebView>,
+        is_lazy: bool,
     ) -> Self {
         let session = if is_incognito {
             webkit6::NetworkSession::new_ephemeral()
@@ -63,12 +73,20 @@ impl BrowserTab {
             persistent_session.clone()
         };
 
-        let webview = WebView::builder()
+        if let Some(wm) = session.website_data_manager() {
+            wm.set_favicons_enabled(true);
+        }
+
+        let mut builder = WebView::builder()
             .user_content_manager(content_manager)
-            .network_session(&session)
             .vexpand(true)
-            .hexpand(true)
-            .build();
+            .hexpand(true);
+        if let Some(rv) = related_view {
+            builder = builder.related_view(rv);
+        } else {
+            builder = builder.network_session(&session);
+        }
+        let webview = builder.build();
         webview.set_background_color(&gtk4::gdk::RGBA::new(0.0, 0.0, 0.0, 1.0));
 
         if let Some(s) = webkit6::prelude::WebViewExt::settings(&webview) {
@@ -422,14 +440,71 @@ impl BrowserTab {
             true
         });
 
+        // Evitar que un cuelgue del proceso web cierre el navegador; solo recuperar si la pestaña sigue activa
+        webview.connect_web_process_terminated(move |view, reason| {
+            if reason == webkit6::WebProcessTerminationReason::Crashed && view.root().is_some() {
+                eprintln!("[Nika] WebProcess crasheó; recuperando pestaña");
+                view.reload();
+            } else {
+                eprintln!("[Nika] WebProcess finalizó ordenadamente ({:?})", reason);
+            }
+        });
+
+        // Manejar apertura de enlaces en nuevas pestañas / popups (target="_blank" y window.open)
+        let opener_create = tab_opener.clone();
+        let incog_create = is_incognito;
+        webview.connect_create(move |view, _nav_action| -> Option<gtk4::Widget> {
+            if let Some(ref opener) = *opener_create.borrow() {
+                // Pasamos URL vacía y el related_view actual.
+                // Al ser URL vacía, BrowserTab::new no llama a load_uri;
+                // WebKit se encarga de realizar la navegación automáticamente en la nueva pestaña.
+                let new_tab = opener("", incog_create, Some(view));
+                Some(new_tab.webview.clone().upcast::<gtk4::Widget>())
+            } else {
+                None
+            }
+        });
+
+        let opener_decide = tab_opener.clone();
+        let incog_decide = is_incognito;
         webview.connect_decide_policy(move |_view, decision, decision_type| {
-            if decision_type == PolicyDecisionType::Response {
-                if let Ok(resp_decision) = decision.clone().downcast::<ResponsePolicyDecision>() {
-                    if !resp_decision.is_mime_type_supported() {
-                        resp_decision.download();
+            match decision_type {
+                PolicyDecisionType::Response => {
+                    if let Ok(resp_decision) = decision.clone().downcast::<ResponsePolicyDecision>() {
+                        if !resp_decision.is_mime_type_supported() {
+                            resp_decision.download();
+                            return true;
+                        }
+                    }
+                }
+                PolicyDecisionType::NavigationAction => {
+                    if let Ok(nav) = decision.clone().downcast::<webkit6::NavigationPolicyDecision>() {
+                        if let Some(action) = nav.navigation_action() {
+                            let btn = action.mouse_button();
+                            let mods = action.modifiers();
+                            let is_middle = btn == 2;
+                            let is_ctrl = (mods & gtk4::gdk::ModifierType::CONTROL_MASK.bits()) != 0;
+                            if is_middle || is_ctrl {
+                                if let Some(req) = action.request() {
+                                    if let Some(uri) = req.uri() {
+                                        if let Some(ref opener) = *opener_decide.borrow() {
+                                            opener(uri.as_str(), incog_decide, None);
+                                            nav.ignore();
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                PolicyDecisionType::NewWindowAction => {
+                    if let Ok(nav) = decision.clone().downcast::<webkit6::NavigationPolicyDecision>() {
+                        nav.use_();
                         return true;
                     }
                 }
+                _ => {}
             }
             false
         });
@@ -693,9 +768,15 @@ icon.set_icon_name(None);
         webview.connect_estimated_load_progress_notify(clone!(
             #[weak]
             progress_bar,
+            #[weak]
+            tab_view,
+            #[weak]
+            page,
             move |view| {
-                let progress = view.estimated_load_progress();
-                progress_bar.set_fraction(progress);
+                if tab_view.selected_page().as_ref() == Some(&page) {
+                    let progress = view.estimated_load_progress();
+                    progress_bar.set_fraction(progress);
+                }
             }
         ));
 
@@ -802,6 +883,9 @@ icon.set_icon_name(None);
             #[strong]
             is_incognito,
             move |view, event| {
+                if view.root().is_none() {
+                    return;
+                }
                 let is_active = tab_view.selected_page() == Some(page.clone());
                 match event {
                     LoadEvent::Started => {
@@ -912,9 +996,34 @@ icon.set_icon_name(None);
                                 page.set_title(t);
                             } else {
                                 if let Some(texture) = view.favicon() {
+                                    icon.set_icon_name(None);
                                     icon.set_paintable(Some(&texture));
                                 } else {
-                                    FaviconManager::load_for_url(&uri, &icon);
+                                    let has_cached = FaviconManager::load_for_url(&uri, &icon);
+                                    if !has_cached {
+                                        let u_clone = uri.clone();
+                                        let icon_clone = icon.clone();
+                                        view.evaluate_javascript(
+                                            r#"
+                                                (function() {
+                                                    let el = document.querySelector('link[rel="shortcut icon"]') ||
+                                                             document.querySelector('link[rel~="icon"]') ||
+                                                             document.querySelector('link[rel="apple-touch-icon"]');
+                                                    return el ? el.href : '';
+                                                })()
+                                            "#,
+                                            None,
+                                            None,
+                                            None::<&gio::Cancellable>,
+                                            move |res| {
+                                                let candidate = res.ok().and_then(|v| {
+                                                    let s = v.to_str();
+                                                    if !s.is_empty() { Some(s.to_string()) } else { None }
+                                                });
+                                                FaviconManager::fetch_for_url(&u_clone, candidate, &icon_clone);
+                                            },
+                                        );
+                                    }
                                 }
                                 if let Some(title) = view.title() {
                                     if !title.is_empty() {
@@ -993,9 +1102,27 @@ icon.set_icon_name(None);
             is_translated: is_translated_rc,
             original_url: original_url_rc,
             mute_btn,
+            pending_lazy_url: Rc::new(RefCell::new(None)),
         };
 
-        tab.load_uri(home_url);
+        if is_lazy && !home_url.is_empty() {
+            *tab.pending_lazy_url.borrow_mut() = Some(home_url.to_string());
+            *tab.current_url.borrow_mut() = home_url.to_string();
+            let display_title = if let Ok(parsed) = url::Url::parse(home_url) {
+                if let Some(host) = parsed.host_str() {
+                    host.to_string()
+                } else {
+                    home_url.to_string()
+                }
+            } else {
+                home_url.to_string()
+            };
+            tab.title_label.set_text(&display_title);
+            tab.page.set_title(&display_title);
+            let _ = FaviconManager::load_for_url(home_url, &tab.icon);
+        } else if !home_url.is_empty() {
+            tab.load_uri(home_url);
+        }
         tab.apply_theme_to_page(is_dark);
 
         tab
@@ -1157,12 +1284,15 @@ icon.set_icon_name(None);
             } else {
                 *self.is_translated.borrow_mut() = true;
             }
-            self.icon.set_icon_name(Some(if self.is_incognito {
-                "nika-incognito-symbolic"
-            } else {
-                "web-browser-symbolic"
-            }));
-            FaviconManager::load_for_url(trimmed, &self.icon);
+            let has_cached = FaviconManager::load_for_url(trimmed, &self.icon);
+            if !has_cached {
+                self.icon.set_paintable(None::<&gtk4::gdk::Paintable>);
+                self.icon.set_icon_name(Some(if self.is_incognito {
+                    "nika-incognito-symbolic"
+                } else {
+                    "web-browser-symbolic"
+                }));
+            }
             let cleaned = PrivacyEngine::clean_url(trimmed);
             *self.current_url.borrow_mut() = cleaned.clone();
             self.webview.load_uri(&cleaned);

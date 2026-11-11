@@ -57,6 +57,7 @@ impl DownloadManager {
         // Panel lateral flotante de descargas
         let revealer = gtk4::Revealer::new();
         revealer.set_transition_type(gtk4::RevealerTransitionType::SlideLeft);
+        revealer.set_transition_duration(280);
         revealer.set_reveal_child(false);
         revealer.set_hexpand(false);
         revealer.set_halign(gtk4::Align::End);

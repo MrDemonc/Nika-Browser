@@ -9,6 +9,7 @@ impl ZoomToast {
     pub fn new() -> Self {
         let revealer = gtk4::Revealer::new();
         revealer.set_transition_type(gtk4::RevealerTransitionType::Crossfade);
+        revealer.set_transition_duration(260);
         revealer.set_reveal_child(false);
         revealer.set_valign(gtk4::Align::Start);
         revealer.set_halign(gtk4::Align::Center);

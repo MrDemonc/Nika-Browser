@@ -12,6 +12,7 @@ libadwaita = { version = "0.9", features = ["v1_6"] }
 webkit6 = { version = "0.6", features = ["v2_42"] }
 glib = "0.22"
 gio = "0.22"
+gdk-pixbuf = "0.22"
 url = "2.5"
 regex = "1.10"
 serde = { version = "1.0", features = ["derive"] }

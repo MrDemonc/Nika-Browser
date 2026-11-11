@@ -15,7 +15,7 @@ use libadwaita::prelude::*;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use webkit6::UserContentManager;
+use webkit6::{UserContentManager, WebView};
 use webkit6::prelude::*;
 
 /// Estructura principal del navegador Nika
@@ -40,6 +40,7 @@ pub struct BrowserApp {
     pub permissions_popover: Rc<PermissionsPopover>,
     pub translation_popover: Rc<crate::ui::TranslationPopover>,
     pub active_media_page: Rc<RefCell<Option<adw::TabPage>>>,
+    pub tab_opener: Rc<RefCell<Option<Rc<dyn Fn(&str, bool, Option<&WebView>) -> BrowserTab>>>>,
 }
 
 impl BrowserApp {
@@ -57,18 +58,10 @@ impl BrowserApp {
             PrivacyEngine::apply_content_filters(&content_manager, &rules_path);
         }
 
-        // Optimización de memoria WebKit: Modelo de caché DocumentBrowser y límites de presión de RAM
+        // Optimización WebKit: Modelo de caché WebBrowser de alto rendimiento sin límites agresivos de memoria
         if let Some(ctx) = webkit6::WebContext::default() {
-            ctx.set_cache_model(webkit6::CacheModel::DocumentBrowser);
+            ctx.set_cache_model(webkit6::CacheModel::WebBrowser);
         }
-
-        let mut mem_settings = webkit6::MemoryPressureSettings::new();
-        mem_settings.set_memory_limit(1024);
-        mem_settings.set_kill_threshold(0.95);
-        mem_settings.set_strict_threshold(0.90);
-        mem_settings.set_conservative_threshold(0.80);
-        mem_settings.set_poll_interval(5.0);
-        webkit6::NetworkSession::set_memory_pressure_settings(&mut mem_settings);
 
         let data_dir = glib::user_data_dir().join("nika-browser");
         let cache_dir = glib::user_cache_dir().join("nika-browser");
@@ -77,6 +70,10 @@ impl BrowserApp {
 
         let persistent_session =
             webkit6::NetworkSession::new(data_dir.to_str(), cache_dir.to_str());
+
+        if let Some(wm) = persistent_session.website_data_manager() {
+            wm.set_favicons_enabled(true);
+        }
 
         if let Some(cm) = persistent_session.cookie_manager() {
             let cookie_path = data_dir.join("cookies.sqlite");
@@ -91,6 +88,9 @@ impl BrowserApp {
         persistent_session.set_itp_enabled(true);
 
         if let Some(def_session) = webkit6::NetworkSession::default() {
+            if let Some(wm) = def_session.website_data_manager() {
+                wm.set_favicons_enabled(true);
+            }
             if let Some(cm) = def_session.cookie_manager() {
                 let cookie_path = data_dir.join("cookies.sqlite");
                 cm.set_persistent_storage(
@@ -116,8 +116,12 @@ impl BrowserApp {
         window.add_css_class("dark-theme");
 
         let download_manager = DownloadManager::new(settings.clone());
-        let header = HeaderComponents::new(&download_manager.button);
         let sidebar = SidebarComponents::new(settings.clone());
+        let header = HeaderComponents::new(
+            &download_manager.button,
+            &sidebar.translate_btn,
+        );
+        sidebar.attach_header(header.header_bar.upcast_ref(), header.tools_row.upcast_ref());
         let find_bar = FindBar::new();
         let zoom_toast = ZoomToast::new();
 
@@ -129,23 +133,28 @@ impl BrowserApp {
         tab_view.set_vexpand(true);
         tab_view.set_hexpand(true);
 
-        // Overlay principal sobre la vista web:
-        // Contiene la vista de pestañas como base, y como capas flotantes:
-        // gestor de descargas, barra de búsqueda en página y notificación de zoom.
+        // Contenedor vertical para el canvas web (barra de progreso arriba de la página)
+        let web_box = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+        web_box.set_vexpand(true);
+        web_box.set_hexpand(true);
+        web_box.append(&progress_bar);
+        web_box.append(&tab_view);
+
+        // Overlay principal sobre la vista web (Canvas con esquinas redondeadas estilo Arc)
         let overlay = gtk4::Overlay::new();
         overlay.add_css_class("nika-overlay");
         overlay.set_vexpand(true);
         overlay.set_hexpand(true);
-        overlay.set_child(Some(&tab_view));
+        overlay.set_child(Some(&web_box));
 
         overlay.add_overlay(&download_manager.revealer);
         overlay.add_overlay(&find_bar.revealer);
         overlay.add_overlay(&zoom_toast.revealer);
 
         // Contenedor horizontal:
-        // Cuando el panel de pestañas está fijado (pinned), se acopla en content_box
-        // a la izquierda de la página web, redimensionándola para que no quede tapada.
+        // Cuando el panel lateral está acoplado (docked), se ubica a la izquierda de la página web.
         // Cuando está en auto-ocultar, se superpone como capa flotante (overlay).
+        // En diseño Arc Browser, no existe ninguna barra superior encima de la página web.
         let content_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
         content_box.add_css_class("nika-content-box");
         content_box.set_vexpand(true);
@@ -175,15 +184,7 @@ impl BrowserApp {
             );
         });
 
-        let main_box = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
-        main_box.add_css_class("nika-main-box");
-        main_box.set_vexpand(true);
-        main_box.set_hexpand(true);
-        main_box.append(&header.header_bar);
-        main_box.append(&progress_bar);
-        main_box.append(&content_box);
-
-        window.set_content(Some(&main_box));
+        window.set_content(Some(&content_box));
 
         let tabs = Rc::new(RefCell::new(Vec::new()));
         let theme_manager = Rc::new(RefCell::new(ThemeManager::new()));
@@ -197,6 +198,8 @@ impl BrowserApp {
             settings.clone(),
         ));
         let active_media_page = Rc::new(RefCell::new(None));
+        let tab_opener: Rc<RefCell<Option<Rc<dyn Fn(&str, bool, Option<&WebView>) -> BrowserTab>>>> =
+            Rc::new(RefCell::new(None));
 
         let browser = Rc::new(Self {
             window: window.clone(),
@@ -218,10 +221,59 @@ impl BrowserApp {
             permissions_popover: permissions_popover.clone(),
             translation_popover: translation_popover.clone(),
             active_media_page,
+            tab_opener,
         });
+
+        // Configurar el generador de nuevas pestañas (para popups y enlaces externos)
+        let b_weak = Rc::downgrade(&browser);
+        *browser.tab_opener.borrow_mut() = Some(Rc::new(
+            move |url: &str, is_incognito: bool, related: Option<&WebView>| -> BrowserTab {
+                if let Some(b) = b_weak.upgrade() {
+                    b.add_tab_full(url, is_incognito, related, false)
+                } else {
+                    panic!("El navegador ha sido cerrado");
+                }
+            },
+        ));
 
         // Aplicar idioma inicial configurado a toda la interfaz
         browser.update_language(&settings.borrow().language);
+
+        // Configurar interacción de carpetas de pestañas en el panel lateral
+        browser.sidebar.setup_folders_callbacks(
+            clone!(
+                #[strong]
+                browser,
+                move |url: &str| {
+                    let found = {
+                        let tabs = browser.tabs.borrow();
+                        tabs.iter()
+                            .find(|t| !t.is_incognito && *t.current_url.borrow() == url)
+                            .map(|t| t.page.clone())
+                    };
+                    if let Some(page) = found {
+                        browser.tab_view.set_selected_page(&page);
+                    } else {
+                        browser.add_tab(url);
+                    }
+                }
+            ),
+            clone!(
+                #[strong]
+                browser,
+                move || {
+                    if let Some(tab) = browser.get_active_tab() {
+                        let u = tab.current_url.borrow().clone();
+                        let t = tab.title_label.text().to_string();
+                        if !u.is_empty() && u != "about:blank" {
+                            return Some((t, u));
+                        }
+                    }
+                    None
+                }
+            ),
+        );
+        browser.sidebar.refresh_folders_ui();
 
         // Script Message Handlers para comunicación bidireccional segura con la página de ajustes
         let s_save = settings.clone();
@@ -849,79 +901,6 @@ impl BrowserApp {
             b_next.skip_media_track(true);
         });
 
-        // Periódico para refrescar estado de reproducción multimedia en la barra superior
-        let b_media_poll = browser.clone();
-        glib::timeout_add_local(std::time::Duration::from_millis(3000), move || {
-            let tabs = b_media_poll.tabs.borrow();
-            // Buscar la pestaña activa o cualquiera que esté sonando/reproduciendo
-            let candidate = if let Some(ref p) = *b_media_poll.active_media_page.borrow() {
-                tabs.iter().find(|t| t.page == *p)
-            } else {
-                tabs.iter().find(|t| t.webview.is_playing_audio())
-            }
-            .or_else(|| {
-                // Si no hay ninguna con audio sonando, revisar la pestaña seleccionada actualmente
-                if let Some(sel) = b_media_poll.tab_view.selected_page() {
-                    tabs.iter().find(|t| t.page == sel)
-                } else {
-                    None
-                }
-            });
-
-            if let Some(tab) = candidate {
-                let hdr = b_media_poll.header.clone();
-                let is_playing_audio = tab.webview.is_playing_audio();
-                let page = tab.page.clone();
-                let active_page_rc = b_media_poll.active_media_page.clone();
-
-                let js = r#"
-                    (function() {
-                        let media = document.querySelector('video, audio');
-                        let yt = document.getElementById('movie_player');
-                        let yt_playing = yt && typeof yt.getPlayerState === 'function' && yt.getPlayerState() === 1;
-                        let media_playing = media && !media.paused && media.currentTime > 0;
-                        let has_active_media = yt_playing || media_playing;
-
-                        let paused = true;
-                        if (yt && typeof yt.getPlayerState === 'function') {
-                            paused = yt.getPlayerState() !== 1;
-                        } else if (media) {
-                            paused = media.paused;
-                        }
-
-                        return JSON.stringify({
-                            has_media: has_active_media,
-                            paused: paused
-                        });
-                    })()
-                "#;
-
-                tab.webview.evaluate_javascript(
-                    js,
-                    None,
-                    None,
-                    None::<&gio::Cancellable>,
-                    move |res| {
-                        if let Ok(val) = res {
-                            let json_str = val.to_str();
-                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str)
-                            {
-                                let has_media = parsed["has_media"].as_bool().unwrap_or(false)
-                                    || is_playing_audio;
-                                let paused = parsed["paused"].as_bool().unwrap_or(true);
-                                if has_media {
-                                    *active_page_rc.borrow_mut() = Some(page);
-                                    hdr.set_media_playing_state(!paused);
-                                    hdr.show_media_controls();
-                                }
-                            }
-                        }
-                    },
-                );
-            }
-            glib::ControlFlow::Continue
-        });
-
         // Botones de navegación
         browser.header.btn_back.connect_clicked(clone!(
             #[strong]
@@ -986,6 +965,7 @@ impl BrowserApp {
                 browser.update_header_security_state();
                 browser.update_translate_button_state();
                 if let Some(tab) = browser.get_active_tab() {
+                    tab.ensure_loaded();
                     let u = tab.current_url.borrow().clone();
                     if !u.starts_with("nika://home") && !u.is_empty() {
                         tab.webview.grab_focus();
@@ -1015,12 +995,11 @@ impl BrowserApp {
             move |tab_view, page| {
                 let n_pages = tab_view.n_pages();
                 if n_pages > 1 {
+                    let was_active = tab_view.selected_page().as_ref() == Some(page);
                     let tab_info = {
                         let mut tabs = browser.tabs.borrow_mut();
                         if let Some(pos) = tabs.iter().position(|t| t.page == *page) {
                             let tab = tabs.remove(pos);
-                            tab.webview.stop_loading();
-                            tab.webview.load_uri("about:blank");
                             Some((tab.tab_pill, tab.is_incognito))
                         } else {
                             None
@@ -1045,7 +1024,14 @@ impl BrowserApp {
                         }
                     }
 
+                    if was_active {
+                        browser.progress_bar.set_visible(false);
+                        browser.progress_bar.set_fraction(0.0);
+                        browser.header.reload_btn.set_icon_name("nika-reload-symbolic");
+                    }
+
                     tab_view.close_page_finish(page, true);
+                    browser.update_tabs_visual_state();
                 } else {
                     if let Some(active_tab) = browser.get_active_tab() {
                         active_tab.load_uri(&browser.home_url);
@@ -1316,12 +1302,17 @@ impl BrowserApp {
                 if let Ok(content) = std::fs::read_to_string(&session_file) {
                     if let Ok(state) = serde_json::from_str::<SessionState>(&content) {
                         if !state.urls.is_empty() {
-                            for url in &state.urls {
-                                browser.add_tab(url);
+                            let target_idx = state.active_index.min(state.urls.len() - 1);
+                            for (i, url) in state.urls.iter().enumerate() {
+                                let is_active = i == target_idx;
+                                if is_active {
+                                    browser.add_tab(url);
+                                } else {
+                                    browser.add_tab_lazy(url);
+                                }
                             }
                             let tabs_len = browser.tabs.borrow().len();
                             if tabs_len > 0 {
-                                let target_idx = state.active_index.min(tabs_len - 1);
                                 let target_page = browser.tabs.borrow()[target_idx].page.clone();
                                 browser.tab_view.set_selected_page(&target_page);
                             }
@@ -1340,14 +1331,29 @@ impl BrowserApp {
     }
 
     pub fn add_tab(&self, url: &str) {
-        self.add_tab_internal(url, false);
+        self.add_tab_full(url, false, None, false);
+    }
+
+    pub fn add_tab_lazy(&self, url: &str) {
+        self.add_tab_full(url, false, None, true);
     }
 
     pub fn add_tab_incognito(&self, url: &str) {
-        self.add_tab_internal(url, true);
+        self.add_tab_full(url, true, None, false);
     }
 
-    fn add_tab_internal(&self, url: &str, is_incognito: bool) {
+    #[allow(dead_code)]
+    pub fn add_tab_internal(&self, url: &str, is_incognito: bool) -> BrowserTab {
+        self.add_tab_full(url, is_incognito, None, false)
+    }
+
+    pub fn add_tab_full(
+        &self,
+        url: &str,
+        is_incognito: bool,
+        related: Option<&WebView>,
+        is_lazy: bool,
+    ) -> BrowserTab {
         let is_dark = self.theme_manager.borrow().current_mode == ThemeMode::Dark;
         let new_tab = BrowserTab::new(
             &self.tab_view,
@@ -1365,8 +1371,11 @@ impl BrowserApp {
             &self.persistent_session,
             &self.find_bar.count_label,
             &self.site_permissions,
+            &self.tab_opener,
             is_dark,
             is_incognito,
+            related,
+            is_lazy,
         );
 
         SidebarComponents::attach_tab_drag_and_context_menu(
@@ -1442,18 +1451,33 @@ impl BrowserApp {
             self.sidebar.normal_tabs_box.append(&new_tab.tab_pill);
         }
 
-        let is_home = url == "nika://home" || url.is_empty();
-        if is_home {
-            new_tab.webview.grab_focus();
-        } else {
-            self.header.omnibox.grab_focus();
-            self.header.omnibox.select_region(0, -1);
+        let is_from_webkit = related.is_some();
+        if !is_lazy && !is_from_webkit {
+            let is_home = url == "nika://home" || url.is_empty();
+            if is_home {
+                new_tab.webview.grab_focus();
+            } else {
+                self.header.omnibox.grab_focus();
+                self.header.omnibox.select_region(0, -1);
+            }
+            self.tab_view.set_selected_page(&new_tab.page);
+        } else if is_from_webkit {
+            // Para pestañas creadas desde WebKit (create signal / popups / target="_blank"),
+            // diferir la selección al siguiente ciclo del main loop (idle_add) para que
+            // WebKit termine de vincular el WebPageProxy y el contexto de renderizado antes de dibujar.
+            let page_to_select = new_tab.page.clone();
+            let tv = self.tab_view.clone();
+            let wv = new_tab.webview.clone();
+            glib::idle_add_local_once(move || {
+                tv.set_selected_page(&page_to_select);
+                wv.grab_focus();
+            });
         }
 
-        self.tab_view.set_selected_page(&new_tab.page);
-        self.tabs.borrow_mut().push(new_tab);
+        self.tabs.borrow_mut().push(new_tab.clone());
         self.update_tabs_visual_state();
         self.save_session();
+        new_tab
     }
 
     pub fn show_find_bar(&self) {
@@ -1551,11 +1575,13 @@ impl BrowserApp {
     }
 
     pub fn update_tabs_visual_state(&self) {
+        let mut active_found = false;
         if let Some(selected_page) = self.tab_view.selected_page() {
             let tabs = self.tabs.borrow();
             let lang = self.settings.borrow().language.clone();
             for tab in tabs.iter() {
                 if tab.page == selected_page {
+                    active_found = true;
                     tab.tab_pill.add_css_class("active");
                     let url = tab.current_url.borrow().clone();
                     if !url.starts_with("file://")
@@ -1610,22 +1636,32 @@ impl BrowserApp {
                             )));
                     }
 
-                    // Sincronizar estado del botón de recarga
+                    // Sincronizar estado del botón de recarga y de la barra de progreso
                     if *tab.is_loading.borrow() {
                         self.header.reload_btn.set_icon_name("nika-close-symbolic");
                         self.header
                             .reload_btn
                             .set_tooltip_text(Some(crate::i18n::tr(&lang, "stop_loading")));
+                        self.progress_bar.set_visible(true);
+                        self.progress_bar.set_fraction(tab.webview.estimated_load_progress());
                     } else {
                         self.header.reload_btn.set_icon_name("nika-reload-symbolic");
                         self.header
                             .reload_btn
                             .set_tooltip_text(Some(crate::i18n::tr(&lang, "nav_reload")));
+                        self.progress_bar.set_visible(false);
+                        self.progress_bar.set_fraction(0.0);
                     }
                 } else {
                     tab.tab_pill.remove_css_class("active");
                 }
             }
+        }
+
+        if !active_found {
+            self.header.reload_btn.set_icon_name("nika-reload-symbolic");
+            self.progress_bar.set_visible(false);
+            self.progress_bar.set_fraction(0.0);
         }
     }
 
@@ -1985,40 +2021,66 @@ impl BrowserApp {
     pub fn toggle_media_playback(&self) {
         if let Some(tab) = self.get_active_media_tab() {
             let header = self.header.clone();
+            // Cambio optimista e instantáneo del icono en la interfaz para máxima reactividad
+            let currently_playing = self.header.is_media_playing();
+            self.header.set_media_playing_state(!currently_playing);
+
             let js = r#"
                 (function() {
+                    // 1. YouTube official bottom control bar play button
+                    let ytPlay = document.querySelector('.ytp-play-button');
+                    if (ytPlay) {
+                        ytPlay.click();
+                        let isPaused = ytPlay.getAttribute('data-title-no-tooltip') === 'Play' ||
+                                       (ytPlay.getAttribute('aria-label') && ytPlay.getAttribute('aria-label').includes('Play')) ||
+                                       (ytPlay.getAttribute('aria-label') && ytPlay.getAttribute('aria-label').includes('Reproducir'));
+                        return isPaused ? 'true' : 'false';
+                    }
+
+                    // 2. YouTube large initial play button
                     let largeBtn = document.querySelector('.ytp-large-play-button');
                     if (largeBtn && largeBtn.offsetParent !== null) {
                         largeBtn.click();
-                        return false;
+                        return 'false';
                     }
+
+                    // 3. YouTube player API
                     let yt = document.getElementById('movie_player');
                     if (yt && typeof yt.getPlayerState === 'function') {
                         let state = yt.getPlayerState();
-                        if (state === 1) {
+                        if (state === 1) { // 1 = playing
                             yt.pauseVideo();
-                            return true;
+                            return 'true';
                         } else {
                             yt.playVideo();
-                            return false;
+                            return 'false';
                         }
                     }
-                    let media = document.querySelector('video, audio');
-                    if (media) {
-                        if (media.paused) {
-                            media.play();
-                            return false;
+
+                    // 4. HTML5 Video o Audio
+                    let videos = Array.from(document.querySelectorAll('video, audio'));
+                    let activeMedia = videos.find(m => !m.paused && m.currentTime > 0) || videos[0];
+                    if (activeMedia) {
+                        if (activeMedia.paused) {
+                            activeMedia.play();
+                            return 'false';
                         } else {
-                            media.pause();
-                            return true;
+                            activeMedia.pause();
+                            return 'true';
                         }
                     }
-                    let playBtn = document.querySelector('button[aria-label*="Play"], button[aria-label*="Reproducir"], button[data-testid="control-button-playpause"]');
+
+                    // 5. Botones web universales (Spotify, SoundCloud, Twitch, etc.)
+                    let playBtn = document.querySelector('button[data-testid="control-button-playpause"], .playControl, button[aria-label*="Play"], button[aria-label*="Reproducir"], button[aria-label*="Pause"], button[aria-label*="Pausar"]');
                     if (playBtn) {
                         playBtn.click();
-                        return false;
+                        return 'false';
                     }
-                    return false;
+
+                    // 6. Simular tecla espacio / 'k' para reproductores embebidos
+                    let ev = new KeyboardEvent('keydown', { key: 'k', code: 'KeyK', keyCode: 75, which: 75, bubbles: true });
+                    document.body.dispatchEvent(ev);
+                    return 'false';
                 })()
             "#;
             tab.webview.evaluate_javascript(
@@ -2042,24 +2104,28 @@ impl BrowserApp {
             let js = if forward {
                 r#"
                     (function() {
-                        let nextBtn = document.querySelector('.ytp-next-button, button[data-testid="control-button-skip-forward"], .play-controls__next');
+                        let nextBtn = document.querySelector('.ytp-next-button, button[data-testid="control-button-skip-forward"], .play-controls__next, button[aria-label*="Next"], button[aria-label*="Siguiente"]');
                         if (nextBtn) {
                             nextBtn.click();
                         } else {
                             let media = document.querySelector('video, audio');
-                            if (media) { media.currentTime += 10; }
+                            if (media) {
+                                media.currentTime = Math.min((media.duration || media.currentTime + 10), media.currentTime + 10);
+                            }
                         }
                     })()
                 "#
             } else {
                 r#"
                     (function() {
-                        let prevBtn = document.querySelector('.ytp-prev-button, button[data-testid="control-button-skip-back"], .play-controls__prev');
+                        let prevBtn = document.querySelector('.ytp-prev-button, button[data-testid="control-button-skip-back"], .play-controls__prev, button[aria-label*="Previous"], button[aria-label*="Anterior"]');
                         if (prevBtn) {
                             prevBtn.click();
                         } else {
                             let media = document.querySelector('video, audio');
-                            if (media) { media.currentTime = Math.max(0, media.currentTime - 10); }
+                            if (media) {
+                                media.currentTime = Math.max(0, media.currentTime - 10);
+                            }
                         }
                     })()
                 "#

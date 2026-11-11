@@ -145,17 +145,18 @@ sudo dnf install gcc cargo libwebkitgtk60-devel libadwaita-devel gtk4-devel
 git clone https://github.com/MrDemonc/Nika-Browser.git
 cd Nika-Browser
 
-# Compile in release mode
-cargo build --release
+# Automated compile & local install (recommended):
+./install-local.sh
 
-# Launch Nika Browser
+# Or compile in release mode manually:
+cargo build --release
 ./target/release/nika-browser
 ```
 
-Or run using the launcher script:
-```bash
-./run.sh
-```
+### Script options:
+* `./install-local.sh` : Compila en modo release e instala el binario, icono, recursos y acceso de escritorio.
+* `./install-local.sh --run` : Compila, instala e inicia el navegador automáticamente.
+* `./install-local.sh --debug` : Compilación rápida en modo debug para desarrollo.
 
 ---
 

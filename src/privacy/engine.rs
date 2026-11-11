@@ -90,6 +90,7 @@ impl PrivacyEngine {
         // Habilitar almacenamiento HTML5 (LocalStorage, IndexedDB y bases de datos locales)
         settings.set_enable_html5_local_storage(true);
         settings.set_enable_html5_database(true);
+        // Aceleración por hardware de WebKit
         settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Always);
 
         // El acceso al portapapeles requiere permiso explícito por sitio.
@@ -135,8 +136,8 @@ impl PrivacyEngine {
         // =======================================================
         settings.set_enable_smooth_scrolling(true);
         settings.set_enable_webgl(true);
-        // Desactivar page-cache en memoria para evitar acumulación desmedida de RAM por pestañas
-        settings.set_enable_page_cache(false);
+        // Activar page-cache en memoria para navegación instantánea hacia atrás/adelante sin recarga
+        settings.set_enable_page_cache(true);
 
         // =======================================================
         // Soporte de Reproducción de Videos (YouTube, HTML5, MSE)
