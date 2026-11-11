@@ -212,19 +212,18 @@ entry.omnibox {
   background-color: var(--nika-entry-bg);
   color: var(--nika-text);
   border: 1px solid var(--nika-border);
-  border-radius: 14px;
-  padding: 2px 14px;
-  font-size: 11.5px;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
   min-height: 26px;
-  min-width: 290px;
-  transition: all 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 90px;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
   -gtk-icon-size: 12px;
 }
 
 entry.omnibox:focus {
-  border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.08);
-  transform: scale(1.008);
+  border-color: rgba(72, 219, 251, 0.6);
+  box-shadow: none;
 }
 
 /* Botón del Escudo de Privacidad compacto */
@@ -630,7 +629,7 @@ popover.folder-menu-popover > contents {
   background-color: #181818;
   border: 1px solid #333333;
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
   padding: 6px;
 }
 
@@ -884,7 +883,7 @@ box.docked-sidebar {
   border-radius: 0px;
   margin: 0px;
   padding: 6px 5px 6px 5px;
-  min-width: 180px;
+  min-width: 135px;
   box-shadow: none;
   transition: all 160ms ease;
 }
@@ -905,8 +904,8 @@ box.floating-sidebar {
   border-radius: 12px;
   margin: 6px 6px;
   padding: 4px;
-  min-width: 175px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.95);
+  min-width: 135px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
   transition: all 160ms ease;
 }
 
@@ -1017,7 +1016,7 @@ box.floating-sidebar {
   font-weight: 600;
   border-radius: 9px;
   border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .dark-theme .vertical-tabs-box .tab-pill.active .tab-title {
@@ -1277,7 +1276,7 @@ popover.folder-dialog-popover > contents {
   background-color: #181818;
   border: 1px solid #333333;
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
   padding: 10px 12px;
   min-width: 220px;
 }
@@ -1510,14 +1509,14 @@ popover.downloads-popover > contents {
   border: 1px solid #262626;
   border-radius: 12px;
   padding: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
 }
 
 .dark-theme popover.downloads-popover > contents {
   background-color: #121212;
   color: #f0f0f0;
   border: 1px solid #262626;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
 }
 
 popover.downloads-popover > arrow {
@@ -1854,7 +1853,7 @@ popover.translation-popover > contents {
   background-color: #181818;
   border: 1px solid #333333;
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
   padding: 10px 12px;
   min-width: 250px;
 }
@@ -1918,15 +1917,42 @@ popover.translation-popover > arrow {
   transition: all 140ms ease;
 }
 
+.tab-drop-slot {
+  min-height: 2px;
+  border-radius: 2px;
+  background-color: #00d2d3;
+  margin: 1px 4px;
+}
+
 .dark-theme .tab-drop-slot {
-  background-color: rgba(72, 219, 251, 0.1);
-  border: 1.5px dashed #48dbfb;
+  min-height: 2px;
+  border-radius: 2px;
+  background-color: #00d2d3;
+  border: none;
+  margin: 1px 4px;
 }
 
 .tab-pill.tab-dragging {
   opacity: 0.45;
-  border-style: dashed;
-  border-color: #666666;
+  box-shadow: none;
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+}
+
+.light-theme .tab-pill.tab-dragging {
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+.tab-pill-animate-move {
+  animation: tabMoveGlow 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tabMoveGlow {
+  0% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1.0;
+  }
 }
 
 /* ====================================================================
@@ -2177,11 +2203,12 @@ popover.translation-popover > arrow {
   padding: 1px 2px;
 }
 
-/* Canvas de página web con marco redondeado estilo Arc */
+/* Canvas de página web con marco redondeado estilo Arc (sombras suaves modernas) */
 .nika-overlay {
   border-radius: 12px;
   background-color: #ffffff;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   margin: 4px 6px 6px 0;
 }
 
@@ -2189,30 +2216,341 @@ popover.translation-popover > arrow {
   border-radius: 12px;
   background-color: #121216;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
   margin: 4px 6px 6px 0;
 }
 
-/* Dimensiones compactas para el panel lateral estilo Arc (210px) */
+/* Dimensiones compactas y finas para el panel lateral estilo Arc / Zen (135px) */
 .docked-sidebar,
 .floating-sidebar {
-  min-width: 210px;
+  min-width: 135px;
+}
+
+.arc-sidebar-omnibox {
+  min-width: 90px;
 }
 
 .sidebar-header {
-  padding: 4px 6px 4px 6px;
+  padding: 3px 4px;
   margin-bottom: 2px;
 }
 
-/* Checkbutton en el menú contextual de clic derecho */
+/* Punto de color de carpeta minimalista */
+.folder-color-dot {
+  min-width: 8px;
+  min-height: 8px;
+  border-radius: 9999px;
+  margin: 0 5px 0 2px;
+}
+
+/* Checkbutton compacto en el menú contextual de clic derecho */
 .sidebar-check-opt {
-  font-size: 11.5px;
+  font-size: 11px;
   color: #dddddd;
-  padding: 3px 6px;
+  padding: 2px 4px;
+  min-height: 22px;
+}
+
+.sidebar-check-opt check {
+  min-width: 13px;
+  min-height: 13px;
+  border-radius: 3px;
+  padding: 1px;
+  margin-right: 6px;
+  -gtk-icon-size: 11px;
+}
+
+.sidebar-check-opt label {
+  font-size: 11px;
 }
 
 .sidebar-check-opt:hover {
   color: #ffffff;
+}
+
+/* Paleta de colores para personalizar el navegador */
+.theme-colors-palette {
+  margin: 3px 0 5px 0;
+  padding: 1px 2px;
+}
+
+.color-dot-default {
+  background: linear-gradient(135deg, #2b2b2b 50%, #ffffff 50%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.theme-custom-dot-btn {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 2px;
+  border-radius: 11px;
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  color: #aaaaaa;
+  transition: all 120ms ease;
+}
+
+.theme-custom-dot-btn:hover {
+  border-color: #ffffff;
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ====================================================================
+   Modo Claro Arc Browser con excelente contraste de texto
+   ==================================================================== */
+window.light-theme,
+.light-theme {
+  --pastel-lavender: #6c5ce7;
+  --pastel-mint: #00b894;
+  --pastel-peach: #e17055;
+  --pastel-sky: #0984e3;
+  --pastel-pink: #e84393;
+
+  --nika-bg: #f2f4f8;
+  --nika-header-bg: #e8ecf2;
+  --nika-tabs-bg: #edf0f5;
+  --nika-tab-pill-bg: transparent;
+  --nika-tab-pill-active: #ffffff;
+  --nika-text: #1a1a1f;
+  --nika-text-muted: #555560;
+  --nika-border: #dcdce4;
+  --nika-entry-bg: #ffffff;
+  --nika-accent: #0984e3;
+  --nika-shield-badge: #e2e5eb;
+  --nika-shield-text: #2d3436;
+}
+
+.light-theme .nika-overlay {
+  border-radius: 12px;
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  margin: 4px 6px 6px 0;
+}
+
+.light-theme .docked-sidebar,
+.light-theme .floating-sidebar {
+  background-color: #edf0f5;
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #1a1a1f;
+}
+
+.light-theme .folders-section-header {
+  color: #2c2c34;
+  font-weight: 600;
+}
+
+.light-theme .folders-toggle-chevron {
+  color: #4a4a52;
+}
+
+.light-theme .tab-folder-name {
+  color: #1a1a20;
+  font-weight: 500;
+}
+
+.light-theme .tab-folder-count {
+  color: #666672;
+}
+
+.light-theme .vertical-tabs-box .tab-pill {
+  background-color: transparent;
+  color: #1a1a20;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 4px 6px;
+  margin: 1px 0;
+}
+
+.light-theme .vertical-tabs-box .tab-pill:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #000000;
+}
+
+.light-theme .vertical-tabs-box .tab-pill.active {
+  background-color: #ffffff;
+  color: #000000;
+  font-weight: 600;
+  border-radius: 9px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.light-theme .vertical-tabs-box .tab-pill.active .tab-title {
+  color: #000000;
+  font-weight: 600;
+}
+
+.light-theme .vertical-tabs-box .tab-pill.active .tab-icon {
+  color: #000000;
+}
+
+.light-theme .vertical-tabs-box .tab-pill.active .tab-close-btn {
+  color: #555560;
+}
+
+.light-theme .arc-sidebar-omnibox {
+  background-color: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.14);
+  color: #111114;
+}
+
+.light-theme .arc-sidebar-omnibox:focus {
+  background-color: #ffffff;
+  border-color: #0984e3;
+  box-shadow: 0 0 0 1.5px rgba(9, 132, 227, 0.25);
+}
+
+.light-theme .arc-nav-btn,
+.light-theme .arc-toggle-btn,
+.light-theme .arc-tool-btn {
+  color: #33333a;
+}
+
+.light-theme .arc-nav-btn:hover,
+.light-theme .arc-toggle-btn:hover,
+.light-theme .arc-tool-btn:hover {
+  color: #000000;
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.light-theme .arc-new-tab-btn {
+  color: #3a3a44;
+  font-weight: 500;
+}
+
+.light-theme .arc-new-tab-btn:hover {
+  color: #000000;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-check-opt {
+  color: var(--nika-text);
+  font-size: 11.5px;
+}
+
+.sidebar-check-opt check {
+  min-height: 14px;
+  min-width: 14px;
+  border-radius: 4px;
+  margin-right: 6px;
+}
+
+.sidebar-check-opt label {
+  font-size: 11.5px;
+}
+
+.light-theme .sidebar-check-opt {
+  color: #2c2c34;
+}
+
+.light-theme .sidebar-check-opt:hover {
+  color: #000000;
+}
+
+/* Popovers en modo claro (menús contextuales, descargas, carpetas, traducción) */
+.light-theme popover.tab-menu-popover > contents,
+.light-theme popover.folder-menu-popover > contents,
+.light-theme popover.folder-dialog-popover > contents,
+.light-theme popover.downloads-popover > contents,
+.light-theme popover.translation-popover > contents {
+  background-color: #ffffff;
+  color: #1a1a20;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.light-theme popover.downloads-popover > arrow,
+.light-theme popover.translation-popover > arrow {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.light-theme .tab-menu-btn {
+  background: transparent;
+  color: #334155;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.light-theme .tab-menu-btn:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.light-theme .tab-menu-btn-primary {
+  background-color: #0984e3;
+  color: #ffffff;
+}
+
+.light-theme .tab-menu-btn-primary:hover {
+  background-color: #74b9ff;
+  color: #ffffff;
+}
+
+.light-theme .tab-menu-btn-danger {
+  color: #ef4444;
+}
+
+.light-theme .tab-menu-btn-danger:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.light-theme .tab-menu-section-header {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.light-theme .sidebar-check-opt checkbutton label,
+.light-theme .sidebar-check-opt label {
+  color: #1e293b;
+}
+
+.light-theme .downloads-title {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.light-theme .downloads-empty-label {
+  color: #64748b;
+}
+
+.light-theme .downloads-popover-header {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+.light-theme .folder-popover-title,
+.light-theme .translation-title {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.light-theme .theme-custom-dot-btn {
+  border-color: rgba(0, 0, 0, 0.25);
+  color: #475569;
+}
+
+.light-theme .theme-custom-dot-btn:hover {
+  border-color: #0984e3;
+  color: #0984e3;
+  background-color: rgba(9, 132, 227, 0.08);
+}
+
+.light-theme .folder-color-section-lbl {
+  color: #64748b;
+}
+
+.light-theme .folder-dialog-btn-cancel {
+  color: #64748b;
+}
+
+.light-theme .folder-dialog-btn-cancel:hover {
+  color: #0f172a;
+  background-color: rgba(0, 0, 0, 0.06);
 }
 
 

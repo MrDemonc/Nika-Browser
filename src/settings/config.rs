@@ -71,6 +71,10 @@ fn default_target_lang() -> String {
     "es".to_string()
 }
 
+fn default_theme_mode() -> String {
+    "dark".to_string()
+}
+
 /// Configuración persistente del navegador Nika
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserSettings {
@@ -104,6 +108,10 @@ pub struct BrowserSettings {
     pub auto_translate: bool,
     #[serde(default = "default_target_lang")]
     pub translate_target_lang: String,
+    #[serde(default = "default_theme_mode")]
+    pub theme_mode: String,
+    #[serde(default)]
+    pub theme_color: String,
 }
 
 impl Default for BrowserSettings {
@@ -124,6 +132,8 @@ impl Default for BrowserSettings {
             clear_cache_on_exit: false,
             auto_translate: false,
             translate_target_lang: "es".to_string(),
+            theme_mode: "dark".to_string(),
+            theme_color: String::new(),
         }
     }
 }

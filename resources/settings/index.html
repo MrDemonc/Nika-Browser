@@ -23,6 +23,60 @@
       --input-border: #282828;
     }
 
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #ffffff;
+        --card-bg: #f8f9fa;
+        --card-border: #e2e8f0;
+        --card-hover: #edf2f7;
+        --text: #1a202c;
+        --text-muted: #4a5568;
+        --accent: #10ac84;
+        --accent-hover: #1dd1a1;
+        --accent-glow: rgba(16, 172, 132, 0.15);
+        --danger: #ee5253;
+        --danger-hover: #ff6b6b;
+        --switch-off: #cbd5e0;
+        --switch-on: #10ac84;
+        --input-bg: #ffffff;
+        --input-border: #cbd5e0;
+      }
+    }
+
+    body.light-theme {
+      --bg: #ffffff;
+      --card-bg: #f8f9fa;
+      --card-border: #e2e8f0;
+      --card-hover: #edf2f7;
+      --text: #1a202c;
+      --text-muted: #4a5568;
+      --accent: #10ac84;
+      --accent-hover: #1dd1a1;
+      --accent-glow: rgba(16, 172, 132, 0.15);
+      --danger: #ee5253;
+      --danger-hover: #ff6b6b;
+      --switch-off: #cbd5e0;
+      --switch-on: #10ac84;
+      --input-bg: #ffffff;
+      --input-border: #cbd5e0;
+    }
+
+    body.light-theme .header-icon {
+      background: #eef2f6;
+      border-color: #cbd5e0;
+    }
+
+    body.light-theme .nav-tab {
+      background: #eef2f6;
+      color: #4a5568;
+    }
+
+    body.light-theme .nav-tab.active {
+      background: #ffffff;
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;

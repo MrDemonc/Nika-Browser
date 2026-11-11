@@ -597,7 +597,7 @@ impl BrowserTab {
         title_label.set_hexpand(true);
         title_label.set_halign(gtk4::Align::Start);
         title_label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
-        title_label.set_max_width_chars(16);
+        title_label.set_max_width_chars(12);
 
         let mute_btn = gtk4::Button::from_icon_name("nika-volume-symbolic");
         mute_btn.add_css_class("tab-mute-btn");
@@ -1218,7 +1218,11 @@ icon.set_icon_name(None);
                 ""
             };
 
+            let is_light = self.settings.borrow().theme_mode == "light";
+            let theme_class = if is_light { "light-theme" } else { "dark-theme" };
+
             let html = SETTINGS_HTML
+                .replace("<body>", &format!("<body class=\"{}\">", theme_class))
                 .replace(
                     "/* __INITIAL_SETTINGS__ */",
                     &format!(
@@ -1304,9 +1308,9 @@ icon.set_icon_name(None);
         let uri = self.current_url.borrow().clone();
         if uri.starts_with("nika://") || uri.starts_with("file://") || uri == "about:blank" {
             let js = if is_dark {
-                "if (document.body) { document.body.classList.add('dark'); }"
+                "if (document.body) { document.body.classList.add('dark'); document.body.classList.add('dark-theme'); document.body.classList.remove('light-theme'); }"
             } else {
-                "if (document.body) { document.body.classList.remove('dark'); }"
+                "if (document.body) { document.body.classList.remove('dark'); document.body.classList.remove('dark-theme'); document.body.classList.add('light-theme'); }"
             };
             self.webview
                 .evaluate_javascript(js, None, None, None::<&gio::Cancellable>, |_| {});

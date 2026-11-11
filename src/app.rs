@@ -117,6 +117,7 @@ impl BrowserApp {
 
         let download_manager = DownloadManager::new(settings.clone());
         let sidebar = SidebarComponents::new(settings.clone());
+        download_manager.attach_to_sidebar(&sidebar.sidebar_card);
         let header = HeaderComponents::new(
             &download_manager.button,
             &sidebar.translate_btn,
@@ -147,7 +148,6 @@ impl BrowserApp {
         overlay.set_hexpand(true);
         overlay.set_child(Some(&web_box));
 
-        overlay.add_overlay(&download_manager.revealer);
         overlay.add_overlay(&find_bar.revealer);
         overlay.add_overlay(&zoom_toast.revealer);
 
@@ -186,8 +186,44 @@ impl BrowserApp {
 
         window.set_content(Some(&content_box));
 
-        let tabs = Rc::new(RefCell::new(Vec::new()));
-        let theme_manager = Rc::new(RefCell::new(ThemeManager::new()));
+        let tabs: Rc<RefCell<Vec<crate::browser::tab::BrowserTab>>> = Rc::new(RefCell::new(Vec::new()));
+        let theme_manager = Rc::new(RefCell::new(ThemeManager::new(
+            &settings.borrow().theme_mode,
+            &settings.borrow().theme_color,
+        )));
+        theme_manager.borrow().apply_to_window(&window);
+
+        let tm_sidebar = theme_manager.clone();
+        let win_sidebar = window.clone();
+        let s_sidebar = settings.clone();
+        let tabs_theme = tabs.clone();
+        sidebar.set_on_theme_changed(move |mode, color| {
+            let is_dark = mode == crate::theme::ThemeMode::Dark;
+            s_sidebar.borrow_mut().theme_mode = if is_dark {
+                "dark".to_string()
+            } else {
+                "light".to_string()
+            };
+            s_sidebar.borrow_mut().theme_color = color.to_string();
+            let _ = s_sidebar.borrow().save();
+            let mut tm = tm_sidebar.borrow_mut();
+            tm.current_mode = mode;
+            tm.set_theme_color(&win_sidebar, color);
+            for t in tabs_theme.borrow().iter() {
+                t.apply_theme_to_page(is_dark);
+            }
+        });
+
+        // Mantener la barra lateral visible cuando el popover de descargas está abierto
+        let s_dl_open = sidebar.clone();
+        download_manager.popover.connect_show(move |_| {
+            s_dl_open.on_popover_opened();
+        });
+        let s_dl_close = sidebar.clone();
+        download_manager.popover.connect_closed(move |_| {
+            s_dl_close.on_popover_closed();
+        });
+
         let password_vault = Rc::new(PasswordVault::new());
         let site_permissions = SitePermissionsManager::new();
         let permissions_popover =
@@ -1151,11 +1187,7 @@ impl BrowserApp {
 
                 // Ctrl + J: Alternar descargas
                 if is_ctrl && (keyval == gtk4::gdk::Key::j || keyval == gtk4::gdk::Key::J) {
-                    let cur = browser.download_manager.revealer.reveals_child();
-                    browser.download_manager.revealer.set_reveal_child(!cur);
-                    if !cur {
-                        browser.download_manager.clear_badge();
-                    }
+                    browser.download_manager.toggle_popover();
                     return glib::Propagation::Stop;
                 }
 

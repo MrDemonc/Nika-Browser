@@ -68,9 +68,11 @@ impl HeaderComponents {
 
         // Fila 2: Cápsula de URL / Omnibox en el panel lateral (exacto como Arc en la imagen)
         let omnibox = gtk4::Entry::builder()
-            .placeholder_text("Buscar o ingresar URL...")
+            .placeholder_text("Buscar o URL...")
             .hexpand(true)
             .halign(gtk4::Align::Fill)
+            .width_chars(10)
+            .max_width_chars(14)
             .primary_icon_name("security-high-symbolic")
             .primary_icon_tooltip_text("Permisos y seguridad del sitio (Clic para ver detalles)")
             .primary_icon_activatable(true)

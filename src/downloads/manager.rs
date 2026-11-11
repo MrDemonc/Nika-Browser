@@ -12,7 +12,7 @@ pub struct DownloadManager {
     pub button: gtk4::Button,
     pub active_dot: gtk4::Label,
     pub badge_label: gtk4::Label,
-    pub revealer: gtk4::Revealer,
+    pub popover: gtk4::Popover,
     pub items_box: gtk4::Box,
     pub empty_label: gtk4::Label,
     pub title_label: gtk4::Label,
@@ -22,6 +22,7 @@ pub struct DownloadManager {
     pub settings: Rc<RefCell<BrowserSettings>>,
     next_id: RefCell<u64>,
     pub completed_count: Rc<RefCell<u32>>,
+    pub sidebar_card: Rc<RefCell<Option<gtk4::Box>>>,
 }
 
 impl DownloadManager {
@@ -54,20 +55,17 @@ impl DownloadManager {
         btn_box.append(&badge_label);
         button.set_child(Some(&btn_box));
 
-        // Panel lateral flotante de descargas
-        let revealer = gtk4::Revealer::new();
-        revealer.set_transition_type(gtk4::RevealerTransitionType::SlideLeft);
-        revealer.set_transition_duration(280);
-        revealer.set_reveal_child(false);
-        revealer.set_hexpand(false);
-        revealer.set_halign(gtk4::Align::End);
-        revealer.set_valign(gtk4::Align::Fill);
+        // Popover flotante de descargas
+        let popover = gtk4::Popover::new();
+        popover.add_css_class("folder-menu-popover");
+        popover.add_css_class("downloads-popover");
+        popover.set_has_arrow(false);
+        popover.set_position(gtk4::PositionType::Right);
+        popover.set_offset(8, 0);
 
         let card = gtk4::Box::new(gtk4::Orientation::Vertical, 4);
-        card.add_css_class("floating-sidebar");
-        card.add_css_class("floating-downloads-panel");
         card.set_hexpand(false);
-        card.set_size_request(260, -1);
+        card.set_size_request(240, 280);
 
         // Cabecera del panel de descargas
         let header = gtk4::Box::new(gtk4::Orientation::Horizontal, 2);
@@ -94,6 +92,11 @@ impl DownloadManager {
         close_btn.add_css_class("sidebar-action-btn");
         close_btn.set_tooltip_text(Some("Cerrar panel de descargas (Ctrl+J)"));
 
+        let pop_close = popover.clone();
+        close_btn.connect_clicked(move |_| {
+            pop_close.popdown();
+        });
+
         header.append(&title);
         header.append(&open_folder_btn);
         header.append(&close_btn);
@@ -110,7 +113,7 @@ impl DownloadManager {
         let items_box = gtk4::Box::new(gtk4::Orientation::Vertical, 3);
         items_box.add_css_class("vertical-tabs-box");
         items_box.set_hexpand(false);
-        items_box.set_size_request(248, -1);
+        items_box.set_size_request(228, -1);
 
         let empty_label = gtk4::Label::new(Some("No hay descargas"));
         empty_label.add_css_class("downloads-empty-label");
@@ -121,50 +124,70 @@ impl DownloadManager {
         scroll.set_child(Some(&items_box));
         card.append(&header);
         card.append(&scroll);
-        revealer.set_child(Some(&card));
+        popover.set_child(Some(&card));
 
         let completed_count = Rc::new(RefCell::new(0));
+        let sidebar_card_rc = Rc::new(RefCell::new(None));
 
         let mgr = Rc::new(Self {
             button: button.clone(),
             active_dot,
             badge_label,
-            revealer: revealer.clone(),
+            popover: popover.clone(),
             items_box,
             empty_label,
             title_label: title,
             open_folder_btn,
-            close_btn: close_btn.clone(),
+            close_btn,
             downloads: Rc::new(RefCell::new(Vec::new())),
             settings,
             next_id: RefCell::new(1),
             completed_count,
+            sidebar_card: sidebar_card_rc,
         });
 
         let mgr_weak = Rc::downgrade(&mgr);
-        button.connect_clicked(clone!(
-            #[weak]
-            revealer,
-            move |_| {
-                let cur = revealer.reveals_child();
-                revealer.set_reveal_child(!cur);
-                if !cur {
-                    if let Some(m) = mgr_weak.upgrade() {
-                        m.clear_badge();
-                    }
-                }
+        button.connect_clicked(move |_| {
+            if let Some(m) = mgr_weak.upgrade() {
+                m.toggle_popover();
             }
-        ));
-
-        close_btn.connect_clicked(clone!(
-            #[weak]
-            revealer,
-            move |_| {
-                revealer.set_reveal_child(false);
-            }
-        ));
+        });
 
         mgr
+    }
+
+    /// Adjunta el popover de descargas al contenedor de la barra lateral para alinearlo a la derecha
+    pub fn attach_to_sidebar(&self, sidebar_card: &gtk4::Box) {
+        if self.popover.parent().is_some() {
+            self.popover.unparent();
+        }
+        self.popover.set_parent(sidebar_card);
+        self.popover.set_position(gtk4::PositionType::Right);
+        self.popover.set_offset(8, 0);
+        *self.sidebar_card.borrow_mut() = Some(sidebar_card.clone());
+    }
+
+    /// Muestra el popover de descargas posicionado exactamente al lado derecho de la barra lateral
+    pub fn show_popover(&self) {
+        if let Some(ref card) = *self.sidebar_card.borrow() {
+            let card_w = card.width().max(130);
+            let card_h = card.height();
+            // Alinear al borde derecho de la barra lateral, hacia abajo donde está el botón
+            let target_y = (card_h - 140).max(40);
+            let rect = gtk4::gdk::Rectangle::new(card_w, target_y, 1, 1);
+            self.popover.set_pointing_to(Some(&rect));
+        }
+        self.popover.popup();
+        self.clear_badge();
+    }
+
+    /// Abre o cierra el popover de descargas
+    pub fn toggle_popover(&self) {
+        if self.popover.is_visible() {
+            self.popover.popdown();
+        } else {
+            self.show_popover();
+        }
     }
 
     /// Limpia el número badge de descargas completadas

@@ -31,6 +31,7 @@ pub struct SidebarComponents {
     pub incognito_tabs_box: gtk4::Box,
     pub auto_hide_enabled: Rc<RefCell<bool>>,
     pub on_pin_toggled: Rc<RefCell<Option<Box<dyn Fn(bool)>>>>,
+    pub on_theme_changed: Rc<RefCell<Option<Box<dyn Fn(crate::theme::ThemeMode, &str)>>>>,
     pub is_popover_open: Rc<RefCell<bool>>,
     pub is_pointer_inside: Rc<RefCell<bool>>,
     pub on_open_tab: Rc<RefCell<Option<Box<dyn Fn(&str)>>>>,
@@ -43,6 +44,8 @@ impl SidebarComponents {
         let initial_auto_hide = settings.borrow().sidebar_auto_hide;
         let auto_hide_enabled = Rc::new(RefCell::new(initial_auto_hide));
         let on_pin_toggled: Rc<RefCell<Option<Box<dyn Fn(bool)>>>> = Rc::new(RefCell::new(None));
+        let on_theme_changed: Rc<RefCell<Option<Box<dyn Fn(crate::theme::ThemeMode, &str)>>>> =
+            Rc::new(RefCell::new(None));
         let is_popover_open = Rc::new(RefCell::new(false));
         let is_pointer_inside = Rc::new(RefCell::new(false));
 
@@ -68,7 +71,7 @@ impl SidebarComponents {
             sidebar_card.add_css_class("docked-sidebar");
         }
         sidebar_card.set_hexpand(false);
-        sidebar_card.set_size_request(210, -1);
+        sidebar_card.set_size_request(135, -1);
 
         let sidebar_toggle_btn = gtk4::Button::from_icon_name("nika-sidebar-symbolic");
         sidebar_toggle_btn.add_css_class("sidebar-action-btn");
@@ -76,6 +79,8 @@ impl SidebarComponents {
 
         let new_tab_btn = gtk4::Button::with_label("+ Nueva pestaña");
         new_tab_btn.add_css_class("arc-new-tab-btn");
+        new_tab_btn.set_halign(gtk4::Align::Start);
+        new_tab_btn.set_margin_start(4);
         new_tab_btn.set_tooltip_text(Some("Nueva pestaña (Ctrl+T)"));
 
         let new_incognito_tab_btn = gtk4::Button::from_icon_name("nika-incognito-symbolic");
@@ -101,7 +106,7 @@ impl SidebarComponents {
         let tabs_box = gtk4::Box::new(gtk4::Orientation::Vertical, 4);
         tabs_box.add_css_class("vertical-tabs-box");
         tabs_box.set_hexpand(false);
-        tabs_box.set_size_request(195, -1);
+        tabs_box.set_size_request(125, -1);
 
         // ====================================================================
         // Sección de Carpetas de Pestañas (Situada al principio)
@@ -326,6 +331,7 @@ impl SidebarComponents {
             incognito_tabs_box,
             auto_hide_enabled,
             on_pin_toggled,
+            on_theme_changed,
             is_popover_open,
             is_pointer_inside,
             on_open_tab,
@@ -439,10 +445,12 @@ impl SidebarComponents {
         });
         chevron.add_css_class("tab-folder-chevron");
 
-        // El icono de la carpeta toma DIRECTAMENTE el color pastel elegido (sin punto feo)
-        let folder_icon = gtk4::Image::from_icon_name("nika-folder-symbolic");
-        folder_icon.add_css_class("tab-folder-icon");
-        folder_icon.add_css_class(&color_to_class(&folder.color));
+        // Punto de color minimalista estilo Arc / Zen Browser
+        let folder_dot = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
+        folder_dot.add_css_class("folder-color-dot");
+        folder_dot.add_css_class(&color_to_class(&folder.color));
+        folder_dot.set_valign(gtk4::Align::Center);
+        folder_dot.set_halign(gtk4::Align::Center);
 
         let name_label = gtk4::Label::new(Some(&folder.name));
         name_label.add_css_class("tab-folder-name");
@@ -454,7 +462,7 @@ impl SidebarComponents {
         count_label.add_css_class("tab-folder-count");
 
         header_row.append(&chevron);
-        header_row.append(&folder_icon);
+        header_row.append(&folder_dot);
         header_row.append(&name_label);
         header_row.append(&count_label);
 
@@ -573,11 +581,19 @@ impl SidebarComponents {
                 tab_right_click.connect_pressed(move |_, _, _, _| {
                     let pop = gtk4::Popover::new();
                     pop.add_css_class("tab-menu-popover");
-                    pop.set_parent(&tab_row_ref);
+                    pop.set_has_arrow(false);
+                    pop.set_parent(&s_ctx.sidebar_card);
+                    pop.set_position(gtk4::PositionType::Right);
+                    pop.set_offset(8, 0);
+                    let (_, item_y) = tab_row_ref.translate_coordinates(&s_ctx.sidebar_card, 0.0, 0.0).unwrap_or((0.0, 100.0));
+                    let target_y = item_y as i32 + 10;
+                    let card_w = s_ctx.sidebar_card.width().max(130);
+                    let rect = gtk4::gdk::Rectangle::new(card_w, target_y, 1, 1);
+                    pop.set_pointing_to(Some(&rect));
 
                     let mbox = gtk4::Box::new(gtk4::Orientation::Vertical, 2);
 
-                    let b_open = gtk4::Button::with_label("🌐 Abrir pestaña");
+                    let b_open = gtk4::Button::with_label("Abrir pestaña");
                     b_open.add_css_class("tab-menu-btn");
                     let s_op = s_ctx.clone();
                     let u_op = url_copy.clone();
@@ -589,7 +605,7 @@ impl SidebarComponents {
                         p_op.popdown();
                     });
 
-                    let b_copy = gtk4::Button::with_label("📋 Copiar enlace");
+                    let b_copy = gtk4::Button::with_label("Copiar enlace");
                     b_copy.add_css_class("tab-menu-btn");
                     let u_cp = url_copy.clone();
                     let p_cp = pop.clone();
@@ -600,7 +616,7 @@ impl SidebarComponents {
                         p_cp.popdown();
                     });
 
-                    let b_rem = gtk4::Button::with_label("✖ Quitar de carpeta");
+                    let b_rem = gtk4::Button::with_label("Quitar de carpeta");
                     b_rem.add_css_class("tab-menu-btn");
                     b_rem.add_css_class("tab-menu-btn-danger");
                     let s_rem = s_ctx.clone();
@@ -644,8 +660,13 @@ impl SidebarComponents {
         popover.add_css_class("folder-menu-popover");
         popover.set_has_arrow(false);
         popover.set_position(gtk4::PositionType::Right);
-        popover.set_offset(10, 0);
-        popover.set_parent(parent);
+        popover.set_offset(8, 0);
+        popover.set_parent(&self.sidebar_card);
+        let (_, folder_y) = parent.translate_coordinates(&self.sidebar_card, 0.0, 0.0).unwrap_or((0.0, 80.0));
+        let target_y = folder_y as i32 + 10;
+        let card_w = self.sidebar_card.width().max(130);
+        let rect = gtk4::gdk::Rectangle::new(card_w, target_y, 1, 1);
+        popover.set_pointing_to(Some(&rect));
 
         let menu_box = gtk4::Box::new(gtk4::Orientation::Vertical, 2);
         menu_box.set_size_request(190, -1);
@@ -763,8 +784,13 @@ impl SidebarComponents {
         popover.add_css_class("folder-dialog-popover");
         popover.set_has_arrow(false);
         popover.set_position(gtk4::PositionType::Right);
-        popover.set_offset(10, 0);
-        popover.set_parent(parent);
+        popover.set_offset(8, 0);
+        popover.set_parent(&self.sidebar_card);
+        let (_, btn_y) = parent.translate_coordinates(&self.sidebar_card, 0.0, 0.0).unwrap_or((0.0, 50.0));
+        let target_y = btn_y as i32 + 10;
+        let card_w = self.sidebar_card.width().max(130);
+        let rect = gtk4::gdk::Rectangle::new(card_w, target_y, 1, 1);
+        popover.set_pointing_to(Some(&rect));
 
         let content = gtk4::Box::new(gtk4::Orientation::Vertical, 6);
         content.add_css_class("translation-content-box");
@@ -906,8 +932,13 @@ impl SidebarComponents {
         popover.add_css_class("folder-dialog-popover");
         popover.set_has_arrow(false);
         popover.set_position(gtk4::PositionType::Right);
-        popover.set_offset(10, 0);
-        popover.set_parent(parent);
+        popover.set_offset(8, 0);
+        popover.set_parent(&self.sidebar_card);
+        let (_, f_y) = parent.translate_coordinates(&self.sidebar_card, 0.0, 0.0).unwrap_or((0.0, 80.0));
+        let target_y = f_y as i32 + 10;
+        let card_w = self.sidebar_card.width().max(130);
+        let rect = gtk4::gdk::Rectangle::new(card_w, target_y, 1, 1);
+        popover.set_pointing_to(Some(&rect));
 
         let content = gtk4::Box::new(gtk4::Orientation::Vertical, 6);
         content.add_css_class("translation-content-box");
@@ -988,8 +1019,13 @@ impl SidebarComponents {
         popover.add_css_class("folder-dialog-popover");
         popover.set_has_arrow(false);
         popover.set_position(gtk4::PositionType::Right);
-        popover.set_offset(10, 0);
-        popover.set_parent(parent);
+        popover.set_offset(8, 0);
+        popover.set_parent(&self.sidebar_card);
+        let (_, f_y) = parent.translate_coordinates(&self.sidebar_card, 0.0, 0.0).unwrap_or((0.0, 80.0));
+        let target_y = f_y as i32 + 10;
+        let card_w = self.sidebar_card.width().max(130);
+        let rect = gtk4::gdk::Rectangle::new(card_w, target_y, 1, 1);
+        popover.set_pointing_to(Some(&rect));
 
         let content = gtk4::Box::new(gtk4::Orientation::Vertical, 6);
         content.add_css_class("translation-content-box");
@@ -1059,10 +1095,16 @@ impl SidebarComponents {
         let popover = gtk4::Popover::new();
         popover.add_css_class("folder-menu-popover");
         popover.set_has_arrow(false);
-        popover.set_parent(parent);
+        popover.set_position(gtk4::PositionType::Right);
+        popover.set_offset(8, 0);
+        popover.set_parent(&self.sidebar_card);
+        let card_w = self.sidebar_card.width().max(130);
+        let target_y = (y as i32).max(10);
+        let rect = gtk4::gdk::Rectangle::new(card_w, target_y, 1, 1);
+        popover.set_pointing_to(Some(&rect));
 
         let menu_box = gtk4::Box::new(gtk4::Orientation::Vertical, 4);
-        menu_box.set_size_request(210, -1);
+        menu_box.set_size_request(185, -1);
         menu_box.set_margin_start(6);
         menu_box.set_margin_end(6);
         menu_box.set_margin_top(6);
@@ -1074,7 +1116,7 @@ impl SidebarComponents {
         title_lbl.set_halign(gtk4::Align::Start);
         menu_box.append(&title_lbl);
 
-        // Opción con casilla de verificación: Ocultar automáticamente
+        // Opción con casilla de verificación: Ocultar automáticamente (compacta)
         let check_auto_hide = gtk4::CheckButton::with_label("Ocultar automáticamente");
         check_auto_hide.add_css_class("sidebar-check-opt");
         check_auto_hide.set_active(*self.auto_hide_enabled.borrow());
@@ -1106,9 +1148,6 @@ impl SidebarComponents {
         });
         menu_box.append(&check_auto_hide);
 
-        let sep = gtk4::Separator::new(gtk4::Orientation::Horizontal);
-        menu_box.append(&sep);
-
         let make_item_btn = |text: &str| -> gtk4::Button {
             let btn = gtk4::Button::new();
             btn.add_css_class("tab-menu-btn");
@@ -1121,6 +1160,114 @@ impl SidebarComponents {
             btn.set_child(Some(&lbl));
             btn
         };
+
+        // Alternador de tema Claro / Oscuro
+        let is_light = self.settings.borrow().theme_mode == "light";
+        let btn_theme = make_item_btn(if is_light {
+            "Modo oscuro"
+        } else {
+            "Modo claro"
+        });
+        let s_thm = self.clone();
+        let pop_thm = popover.clone();
+        btn_theme.connect_clicked(move |_| {
+            let next_mode = if s_thm.settings.borrow().theme_mode == "light" {
+                crate::theme::ThemeMode::Dark
+            } else {
+                crate::theme::ThemeMode::Light
+            };
+            let col = s_thm.settings.borrow().theme_color.clone();
+            if let Some(ref cb) = *s_thm.on_theme_changed.borrow() {
+                cb(next_mode, &col);
+            }
+            pop_thm.popdown();
+        });
+        menu_box.append(&btn_theme);
+
+        // Selector de color del navegador estilo Arc
+        let color_lbl = gtk4::Label::new(Some("Color del navegador:"));
+        color_lbl.add_css_class("tab-menu-section-header");
+        color_lbl.set_halign(gtk4::Align::Start);
+        color_lbl.set_margin_top(4);
+        menu_box.append(&color_lbl);
+
+        let colors_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
+        colors_row.add_css_class("theme-colors-palette");
+
+        let presets: &[(&str, &str)] = &[
+            ("Por defecto", ""),
+            ("Coral", "#ff7675"),
+            ("Melocotón", "#f39c12"),
+            ("Menta", "#1dd1a1"),
+            ("Cian", "#00d2d3"),
+            ("Lavanda", "#a29bfe"),
+        ];
+
+        for (name, hex) in presets {
+            let dot = gtk4::Button::new();
+            dot.add_css_class("color-picker-dot");
+            dot.set_tooltip_text(Some(name));
+            if hex.is_empty() {
+                dot.add_css_class("color-dot-default");
+            } else {
+                dot.add_css_class(&color_to_class(hex));
+            }
+
+            let s_dot = self.clone();
+            let hex_str = hex.to_string();
+            let pop_dot = popover.clone();
+            dot.connect_clicked(move |_| {
+                let mode = if s_dot.settings.borrow().theme_mode == "light" {
+                    crate::theme::ThemeMode::Light
+                } else {
+                    crate::theme::ThemeMode::Dark
+                };
+                if let Some(ref cb) = *s_dot.on_theme_changed.borrow() {
+                    cb(mode, &hex_str);
+                }
+                pop_dot.popdown();
+            });
+            colors_row.append(&dot);
+        }
+
+        let custom_btn = gtk4::Button::from_icon_name("color-select-symbolic");
+        custom_btn.add_css_class("theme-custom-dot-btn");
+        custom_btn.set_tooltip_text(Some("Elegir color personalizado..."));
+        let s_custom = self.clone();
+        let pop_custom = popover.clone();
+        let p_root = parent.root();
+        custom_btn.connect_clicked(move |_| {
+            pop_custom.popdown();
+            let dialog = gtk4::ColorDialog::builder()
+                .title("Personalizar color de Nika Browser")
+                .with_alpha(false)
+                .build();
+            let win = p_root.as_ref().and_then(|r| r.downcast_ref::<gtk4::Window>());
+            let s_cb = s_custom.clone();
+            dialog.choose_rgba(win, None::<&gtk4::gdk::RGBA>, None::<&gio::Cancellable>, move |res| {
+                if let Ok(rgba) = res {
+                    let hex = format!(
+                        "#{:02x}{:02x}{:02x}",
+                        (rgba.red() * 255.0).round() as u8,
+                        (rgba.green() * 255.0).round() as u8,
+                        (rgba.blue() * 255.0).round() as u8,
+                    );
+                    let mode = if s_cb.settings.borrow().theme_mode == "light" {
+                        crate::theme::ThemeMode::Light
+                    } else {
+                        crate::theme::ThemeMode::Dark
+                    };
+                    if let Some(ref cb) = *s_cb.on_theme_changed.borrow() {
+                        cb(mode, &hex);
+                    }
+                }
+            });
+        });
+        colors_row.append(&custom_btn);
+        menu_box.append(&colors_row);
+
+        let sep = gtk4::Separator::new(gtk4::Orientation::Horizontal);
+        menu_box.append(&sep);
 
         let btn_new_tab = make_item_btn("Nueva pestaña");
         let s_nt = self.clone();
@@ -1167,6 +1314,11 @@ impl SidebarComponents {
     /// Permite conectar un callback cuando se conmuta la fijación del panel lateral
     pub fn set_on_pin_toggled<F: Fn(bool) + 'static>(&self, callback: F) {
         *self.on_pin_toggled.borrow_mut() = Some(Box::new(callback));
+    }
+
+    /// Permite conectar un callback cuando cambia el modo o color del tema
+    pub fn set_on_theme_changed<F: Fn(crate::theme::ThemeMode, &str) + 'static>(&self, callback: F) {
+        *self.on_theme_changed.borrow_mut() = Some(Box::new(callback));
     }
 
     pub fn on_popover_opened(&self) {
@@ -1254,7 +1406,7 @@ impl SidebarComponents {
 
         let drop_indicator = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
         drop_indicator.add_css_class("tab-drop-slot");
-        drop_indicator.set_height_request(28);
+        drop_indicator.set_height_request(2);
 
         let parent_box = if is_incog {
             sidebar.incognito_tabs_box.clone()
@@ -1527,7 +1679,14 @@ impl SidebarComponents {
                 let popover = gtk4::Popover::new();
                 popover.add_css_class("folder-menu-popover");
                 popover.set_has_arrow(false);
-                popover.set_parent(&pill);
+                popover.set_position(gtk4::PositionType::Right);
+                popover.set_offset(8, 0);
+                popover.set_parent(&sidebar_clone.sidebar_card);
+                let (_, tab_y) = pill.translate_coordinates(&sidebar_clone.sidebar_card, 0.0, 0.0).unwrap_or((0.0, 100.0));
+                let target_y = tab_y as i32 + 10;
+                let card_w = sidebar_clone.sidebar_card.width().max(130);
+                let rect = gtk4::gdk::Rectangle::new(card_w, target_y, 1, 1);
+                popover.set_pointing_to(Some(&rect));
 
                 let menu_box = gtk4::Box::new(gtk4::Orientation::Vertical, 2);
                 menu_box.set_size_request(180, -1);
@@ -1769,6 +1928,13 @@ pub fn move_tab_internal(
             let prev_sibling = &siblings[sibling_idx - 1];
             parent_box.reorder_child_after(&target_tab.tab_pill, Some(&prev_sibling.tab_pill));
         }
+
+        // Animación suave de movimiento de pestaña
+        let pill_to_anim = target_tab.tab_pill.clone();
+        pill_to_anim.add_css_class("tab-pill-animate-move");
+        glib::timeout_add_local_once(std::time::Duration::from_millis(350), move || {
+            pill_to_anim.remove_css_class("tab-pill-animate-move");
+        });
 
         drop(tabs_mut);
         save_session_data(tabs, tab_view);
