@@ -33,6 +33,21 @@ curl -fsSL https://raw.githubusercontent.com/MrDemonc/Nika-Browser/main/install.
 > - Installs the official high-resolution transparent icon into `~/.local/share/icons/hicolor/512x512/apps/`.
 > - Sets up the desktop application launcher (`.desktop`) so it appears in your application drawer (Rofi, Wofi, GNOME, KDE, Waybar, etc.).
 
+### 🗑️ Uninstallation
+
+To cleanly uninstall **Nika Browser**:
+
+```bash
+# Using curl:
+curl -fsSL https://raw.githubusercontent.com/MrDemonc/Nika-Browser/main/uninstall.sh | bash
+
+# Or from local repository clone:
+./uninstall.sh
+
+# Or to completely purge all user data, passwords and cache:
+./uninstall.sh --purge
+```
+
 ---
 
 ## ✨ Key Features
@@ -157,6 +172,7 @@ cargo build --release
 * `./install-local.sh` : Compila en modo release e instala el binario, icono, recursos y acceso de escritorio.
 * `./install-local.sh --run` : Compila, instala e inicia el navegador automáticamente.
 * `./install-local.sh --debug` : Compilación rápida en modo debug para desarrollo.
+* `./uninstall.sh` : Desinstala Nika Browser del sistema de forma limpia (soporta `--purge` para borrar datos y cachés).
 
 ---
 

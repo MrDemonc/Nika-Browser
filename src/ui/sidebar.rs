@@ -1099,16 +1099,17 @@ impl SidebarComponents {
         popover.set_offset(8, 0);
         popover.set_parent(&self.sidebar_card);
         let card_w = self.sidebar_card.width().max(130);
-        let target_y = (y as i32).max(10);
+        let card_h = self.sidebar_card.height().max(100);
+        let target_y = (y as i32).clamp(10, card_h - 10);
         let rect = gtk4::gdk::Rectangle::new(card_w, target_y, 1, 1);
         popover.set_pointing_to(Some(&rect));
 
-        let menu_box = gtk4::Box::new(gtk4::Orientation::Vertical, 4);
-        menu_box.set_size_request(185, -1);
-        menu_box.set_margin_start(6);
-        menu_box.set_margin_end(6);
-        menu_box.set_margin_top(6);
-        menu_box.set_margin_bottom(6);
+        let menu_box = gtk4::Box::new(gtk4::Orientation::Vertical, 2);
+        menu_box.set_size_request(145, -1);
+        menu_box.set_margin_start(4);
+        menu_box.set_margin_end(4);
+        menu_box.set_margin_top(4);
+        menu_box.set_margin_bottom(4);
 
         // Título de sección sutil
         let title_lbl = gtk4::Label::new(Some("Barra lateral"));
@@ -1235,33 +1236,74 @@ impl SidebarComponents {
         custom_btn.set_tooltip_text(Some("Elegir color personalizado..."));
         let s_custom = self.clone();
         let pop_custom = popover.clone();
-        let p_root = parent.root();
         custom_btn.connect_clicked(move |_| {
             pop_custom.popdown();
-            let dialog = gtk4::ColorDialog::builder()
-                .title("Personalizar color de Nika Browser")
-                .with_alpha(false)
-                .build();
-            let win = p_root.as_ref().and_then(|r| r.downcast_ref::<gtk4::Window>());
+            let color_pop = gtk4::Popover::new();
+            color_pop.add_css_class("folder-dialog-popover");
+            color_pop.set_has_arrow(false);
+            color_pop.set_position(gtk4::PositionType::Right);
+            color_pop.set_offset(8, 0);
+            color_pop.set_parent(&s_custom.sidebar_card);
+            let card_w = s_custom.sidebar_card.width().max(130);
+            let rect = gtk4::gdk::Rectangle::new(card_w, 180, 1, 1);
+            color_pop.set_pointing_to(Some(&rect));
+
+            let box_container = gtk4::Box::new(gtk4::Orientation::Vertical, 6);
+            box_container.add_css_class("translation-content-box");
+
+            let header_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
+            let title_lbl = gtk4::Label::new(Some("Color personalizado"));
+            title_lbl.add_css_class("translation-title");
+            title_lbl.set_hexpand(true);
+            title_lbl.set_halign(gtk4::Align::Start);
+
+            let close_btn = gtk4::Button::from_icon_name("nika-close-symbolic");
+            close_btn.add_css_class("sidebar-action-btn");
+            let p_close = color_pop.clone();
+            close_btn.connect_clicked(move |_| p_close.popdown());
+
+            header_row.append(&title_lbl);
+            header_row.append(&close_btn);
+            box_container.append(&header_row);
+
+            #[allow(deprecated)]
+            let chooser = gtk4::ColorChooserWidget::new();
+            #[allow(deprecated)]
+            chooser.set_use_alpha(false);
+
+            let cur_hex = s_custom.settings.borrow().theme_color.clone();
+            if let Ok(init_rgba) = gtk4::gdk::RGBA::parse(&cur_hex) {
+                #[allow(deprecated)]
+                chooser.set_rgba(&init_rgba);
+            }
+
             let s_cb = s_custom.clone();
-            dialog.choose_rgba(win, None::<&gtk4::gdk::RGBA>, None::<&gio::Cancellable>, move |res| {
-                if let Ok(rgba) = res {
-                    let hex = format!(
-                        "#{:02x}{:02x}{:02x}",
-                        (rgba.red() * 255.0).round() as u8,
-                        (rgba.green() * 255.0).round() as u8,
-                        (rgba.blue() * 255.0).round() as u8,
-                    );
-                    let mode = if s_cb.settings.borrow().theme_mode == "light" {
-                        crate::theme::ThemeMode::Light
-                    } else {
-                        crate::theme::ThemeMode::Dark
-                    };
-                    if let Some(ref cb) = *s_cb.on_theme_changed.borrow() {
-                        cb(mode, &hex);
-                    }
+            #[allow(deprecated)]
+            chooser.connect_rgba_notify(move |c| {
+                #[allow(deprecated)]
+                let rgba = c.rgba();
+                let hex = format!(
+                    "#{:02x}{:02x}{:02x}",
+                    (rgba.red() * 255.0).round() as u8,
+                    (rgba.green() * 255.0).round() as u8,
+                    (rgba.blue() * 255.0).round() as u8,
+                );
+                let mode = if s_cb.settings.borrow().theme_mode == "light" {
+                    crate::theme::ThemeMode::Light
+                } else {
+                    crate::theme::ThemeMode::Dark
+                };
+                if let Some(ref cb) = *s_cb.on_theme_changed.borrow() {
+                    cb(mode, &hex);
                 }
             });
+
+            box_container.append(&chooser);
+            color_pop.set_child(Some(&box_container));
+            s_custom.on_popover_opened();
+            let s_p_close = s_custom.clone();
+            color_pop.connect_closed(move |_| s_p_close.on_popover_closed());
+            color_pop.popup();
         });
         colors_row.append(&custom_btn);
         menu_box.append(&colors_row);

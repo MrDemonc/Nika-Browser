@@ -46,16 +46,15 @@ impl TranslationPopover {
         settings: Rc<RefCell<BrowserSettings>>,
     ) -> Self {
         let popover = gtk4::Popover::new();
-        popover.set_parent(parent_btn);
+        popover.set_parent(align_to);
         popover.add_css_class("translation-popover");
         popover.set_has_arrow(false);
         popover.set_position(gtk4::PositionType::Right);
-        popover.set_valign(gtk4::Align::Start);
-        popover.set_offset(16, 0);
+        popover.set_offset(8, 0);
 
         let content_box = gtk4::Box::new(gtk4::Orientation::Vertical, 5);
         content_box.add_css_class("translation-content-box");
-        content_box.set_size_request(200, -1);
+        content_box.set_size_request(170, -1);
 
         // Cabecera del popover
         let header_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
@@ -226,11 +225,12 @@ lang_label.set_visible(false);
     }
 
     pub fn popup(&self) {
-        if let (Some(parent_btn), Some(align_to)) =
-            (self.parent_btn.upgrade(), self.align_to.upgrade())
-            && let Some(bounds) = parent_btn.compute_bounds(&align_to)
-        {
-            self.popover.set_offset(16, -(bounds.y() as i32));
+        if let Some(align_to) = self.align_to.upgrade() {
+            let card_w = align_to.width().max(130);
+            let card_h = align_to.height();
+            let target_y = (card_h - 140).max(40);
+            let rect = gtk4::gdk::Rectangle::new(card_w, target_y, 1, 1);
+            self.popover.set_pointing_to(Some(&rect));
         }
         self.popover.popup();
     }

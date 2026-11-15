@@ -5,8 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inicio</title>
   <style>
-    /* Modo Oscuro Negro Puro y Grises Neutros (Predeterminado permanente) */
     :root {
+      --bg: #ffffff;
+      --card-bg: #f8f9fa;
+      --card-border: #e2e8f0;
+      --text-main: #1a202c;
+      --text-muted: #64748b;
+      --accent-lavender: #6c5ce7;
+      --accent-mint: #00b894;
+      --accent-peach: #e17055;
+      --accent-sky: #0984e3;
+      --accent-pink: #e84393;
+      --shield-bg: #edf2f7;
+      --shield-text: #2d3748;
+      --shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+      --input-bg: #ffffff;
+    }
+
+    body.light-theme,
+    body:not(.dark) {
+      --bg: #ffffff;
+      --card-bg: #f8f9fa;
+      --card-border: #e2e8f0;
+      --text-main: #1a202c;
+      --text-muted: #64748b;
+      --accent-lavender: #6c5ce7;
+      --accent-mint: #00b894;
+      --accent-peach: #e17055;
+      --accent-sky: #0984e3;
+      --accent-pink: #e84393;
+      --shield-bg: #edf2f7;
+      --shield-text: #2d3748;
+      --shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+      --input-bg: #ffffff;
+    }
+
+    body.dark,
+    body.dark-theme {
       --bg: #000000;
       --card-bg: #121212;
       --card-border: #242424;
@@ -36,7 +71,7 @@
       height: 84px;
       border-radius: 20px;
       object-fit: cover;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
       transition: transform 0.25s ease;
     }
 
@@ -48,16 +83,8 @@
       font-size: 1.45rem;
       font-weight: 700;
       letter-spacing: -0.5px;
-      color: #ffffff;
+      color: var(--text-main);
     }
-
-    body.dark {
-      --bg: #000000;
-      --card-bg: #121212;
-      --card-border: #242424;
-      --text-main: #F0F0F0;
-      --text-muted: #888888;
-      --accent-lavender: #C0C0C0;
       --accent-mint: #A8A8A8;
       --accent-peach: #B8B8B8;
       --accent-sky: #9C9C9C;

@@ -1245,10 +1245,14 @@ icon.set_icon_name(None);
                 .set_text(if is_en { "Welcome" } else { "Bienvenida" });
             self.icon.set_icon_name(Some("nika-shield-symbolic"));
             let current_json = serde_json::to_string(&*self.settings.borrow()).unwrap_or_default();
-            let html = WELCOME_HTML.replace(
-                "/* __INITIAL_SETTINGS__ */",
-                &format!("window.__NIKA_SETTINGS = {};", current_json),
-            );
+            let is_light = self.settings.borrow().theme_mode == "light";
+            let theme_class = if is_light { "light-theme" } else { "dark-theme dark" };
+            let html = WELCOME_HTML
+                .replace("<body>", &format!("<body class=\"{}\">", theme_class))
+                .replace(
+                    "/* __INITIAL_SETTINGS__ */",
+                    &format!("window.__NIKA_SETTINGS = {};", current_json),
+                );
             self.webview.load_html(&html, Some("nika://welcome"));
         } else if trimmed == "nika://home"
             || trimmed.starts_with("file://")
@@ -1274,10 +1278,14 @@ icon.set_icon_name(None);
                 "nika-home-symbolic"
             }));
             let current_json = serde_json::to_string(&*self.settings.borrow()).unwrap_or_default();
-            let html = HOME_HTML.replace(
-                "/* __INITIAL_SETTINGS__ */",
-                &format!("window.__NIKA_SETTINGS = {};", current_json),
-            );
+            let is_light = self.settings.borrow().theme_mode == "light";
+            let theme_class = if is_light { "light-theme" } else { "dark-theme dark" };
+            let html = HOME_HTML
+                .replace("<body>", &format!("<body class=\"{}\">", theme_class))
+                .replace(
+                    "/* __INITIAL_SETTINGS__ */",
+                    &format!("window.__NIKA_SETTINGS = {};", current_json),
+                );
             self.webview.load_html(&html, Some("nika://home"));
         } else {
             if !trimmed.contains(".translate.goog")

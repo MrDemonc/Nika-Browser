@@ -649,11 +649,11 @@ popover.folder-menu-popover > arrow {
 .tab-menu-btn {
   background: transparent;
   color: #dddddd;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 11.5px;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 11px;
   border: none;
-  min-height: 26px;
+  min-height: 22px;
   transition: all 120ms ease;
 }
 
@@ -1854,8 +1854,8 @@ popover.translation-popover > contents {
   border: 1px solid #333333;
   border-radius: 10px;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
-  padding: 10px 12px;
-  min-width: 250px;
+  padding: 8px 10px;
+  min-width: 175px;
 }
 
 .dark-theme popover.translation-popover > contents {
@@ -1887,23 +1887,38 @@ popover.translation-popover > arrow {
   color: #d0d0d0;
 }
 
-.translation-dropdown {
+dropdown.translation-dropdown {
+  background: transparent;
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  min-width: 110px;
+}
+
+dropdown.translation-dropdown > button {
   background-color: #222222;
   border: 1px solid #383838;
   border-radius: 6px;
   color: #ffffff;
-  padding: 2px 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  min-height: 24px;
+}
+
+dropdown.translation-dropdown > button:hover {
+  background-color: #2c2c2c;
+  border-color: #484848;
 }
 
 .translation-action-btn {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 6px;
+  min-height: 22px;
 }
-
-
-.translation-dropdown { min-width: 130px; }
 /* ====================================================================
    Ranura y animación de arrastre de pestañas (Drag & Drop Gap Slot)
    ==================================================================== */
@@ -2205,19 +2220,25 @@ popover.translation-popover > arrow {
 
 /* Canvas de página web con marco redondeado estilo Arc (sombras suaves modernas) */
 .nika-overlay {
-  border-radius: 12px;
+  border-radius: 10px;
   background-color: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  margin: 4px 6px 6px 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  margin: 3px 4px 4px 3px;
 }
 
 .dark-theme .nika-overlay {
-  border-radius: 12px;
+  border-radius: 10px;
   background-color: #121216;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
-  margin: 4px 6px 6px 0;
+  margin: 3px 4px 4px 3px;
+}
+
+.web-content-box,
+.web-content-box tabview,
+.web-content-box webview {
+  border-radius: 10px;
 }
 
 /* Dimensiones compactas y finas para el panel lateral estilo Arc / Zen (135px) */
@@ -2322,11 +2343,11 @@ window.light-theme,
 }
 
 .light-theme .nika-overlay {
-  border-radius: 12px;
+  border-radius: 10px;
   background-color: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-  margin: 4px 6px 6px 0;
+  margin: 3px 4px 4px 3px;
 }
 
 .light-theme .docked-sidebar,
@@ -2551,6 +2572,210 @@ window.light-theme,
 .light-theme .folder-dialog-btn-cancel:hover {
   color: #0f172a;
   background-color: rgba(0, 0, 0, 0.06);
+}
+
+.theme-colors-palette .color-picker-dot {
+  min-width: 15px;
+  min-height: 15px;
+  margin: 1px 2px;
+}
+
+.theme-colors-palette .theme-custom-dot-btn {
+  min-width: 17px;
+  min-height: 17px;
+  border-radius: 50%;
+  padding: 1px;
+  -gtk-icon-size: 11px;
+}
+
+/* Modo claro: HeaderBar, separadores, shield y widgets adicionales */
+.light-theme headerbar,
+.light-theme window.nika-window headerbar,
+.light-theme headerbar.nika-header,
+.light-theme headerbar.nika-header.flat {
+  background-color: var(--nika-bg);
+  background: var(--nika-bg);
+  color: var(--nika-text);
+  border: none;
+  border-bottom: 1px solid var(--nika-border);
+}
+
+.light-theme .docked-sidebar .sidebar-header,
+.light-theme .sidebar-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.light-theme .folders-divider,
+.light-theme .incognito-divider {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.light-theme .shield-pill {
+  background-color: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #10ac84;
+}
+
+.light-theme .shield-pill:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #10ac84;
+}
+
+.light-theme .settings-btn {
+  color: #4a4a54;
+}
+
+.light-theme .settings-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #000000;
+}
+
+.light-theme .floating-find-card {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.light-theme .find-entry {
+  background-color: #f1f3f7;
+  color: #1a1a20;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.light-theme .find-count-label {
+  color: #666672;
+}
+
+.light-theme .find-btn {
+  color: #4a4a54;
+}
+
+.light-theme .find-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #000000;
+}
+
+.light-theme .zoom-toast-label {
+  background: rgba(255, 255, 255, 0.95);
+  color: #1a1a20;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+
+.light-theme .sidebar-media-card {
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.light-theme .media-badge-title {
+  color: #64748b;
+}
+
+.light-theme .media-dismiss-btn {
+  color: #64748b;
+}
+
+.light-theme .media-dismiss-btn:hover {
+  color: #000000;
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.light-theme dialog.permissions-dialog,
+.light-theme .permissions-dialog,
+.light-theme dialog.permissions-dialog > contents,
+.light-theme .permissions-dialog > contents {
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: #1a1a20;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.light-theme .perm-header-bar {
+  background-color: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.light-theme .perm-dialog-title {
+  color: #1a1a20;
+}
+
+.light-theme .perm-close-btn {
+  color: #64748b;
+}
+
+.light-theme .perm-close-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #000000;
+}
+
+.light-theme .perm-host-card {
+  background-color: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.light-theme .perm-action-btn {
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: #334155;
+}
+
+.light-theme .perm-action-btn:hover {
+  background-color: #f1f5f9;
+  color: #000000;
+}
+
+.light-theme dropdown.translation-dropdown,
+.light-theme popover.translation-popover dropdown {
+  background: transparent;
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+}
+
+.light-theme dropdown.translation-dropdown > button,
+.light-theme popover.translation-popover dropdown > button {
+  background-color: #f8fafc;
+  color: #1a1a20;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  padding: 2px 8px;
+  font-size: 11px;
+  min-height: 24px;
+}
+
+.light-theme dropdown.translation-dropdown > button:hover,
+.light-theme popover.translation-popover dropdown > button:hover {
+  background-color: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.22);
+}
+
+.light-theme .translation-label {
+  color: #334155;
+}
+
+.light-theme .translation-action-btn {
+  background-color: #f1f5f9;
+  color: #1e293b;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.light-theme .translation-action-btn:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.light-theme .translation-action-btn.suggested-action {
+  background-color: #0984e3;
+  color: #ffffff;
+  border: none;
+}
+
+.light-theme .translation-action-btn.suggested-action:hover {
+  background-color: #74b9ff;
+  color: #ffffff;
 }
 
 

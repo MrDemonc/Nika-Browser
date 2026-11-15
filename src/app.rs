@@ -136,6 +136,8 @@ impl BrowserApp {
 
         // Contenedor vertical para el canvas web (barra de progreso arriba de la página)
         let web_box = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+        web_box.add_css_class("web-content-box");
+        web_box.set_overflow(gtk4::Overflow::Hidden);
         web_box.set_vexpand(true);
         web_box.set_hexpand(true);
         web_box.append(&progress_bar);
@@ -144,6 +146,7 @@ impl BrowserApp {
         // Overlay principal sobre la vista web (Canvas con esquinas redondeadas estilo Arc)
         let overlay = gtk4::Overlay::new();
         overlay.add_css_class("nika-overlay");
+        overlay.set_overflow(gtk4::Overflow::Hidden);
         overlay.set_vexpand(true);
         overlay.set_hexpand(true);
         overlay.set_child(Some(&web_box));
